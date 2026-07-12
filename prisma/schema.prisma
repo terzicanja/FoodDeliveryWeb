@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  COURIER
+}
+
+enum RestaurantType {
+  ITALIAN
+  MEXICAN
+  FAST_FOOD
+  CHINESE
+  INDIAN
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  REJECTED
+}
+
+enum PaymentMethod {
+  CASH
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String
+  address      String
+  phone        String
+  role         Role     @default(CUSTOMER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders        Order[]  @relation("CustomerOrders")
+  courierOrders Order[]  @relation("CourierOrders")
+  reviews       Review[]
+
+  @@index([role])
+}
+
+model Restaurant {
+  id              Int              @id @default(autoincrement())
+  name            String
+  description     String?
+  address         String
+  restaurantTypes RestaurantType[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  meals  Meal[]
+  orders Order[]
+}
+
+model Meal {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Decimal  @db.Decimal(10, 2)
+  images       String[]
+  restaurantId Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@index([restaurantId])
+}
+
+model Order {
+  id                    Int           @id @default(autoincrement())
+  status                OrderStatus   @default(PENDING)
+  paymentMethod         PaymentMethod @default(CASH)
+  totalPrice            Decimal       @db.Decimal(10, 2)
+  orderAddress          String
+  estimatedDeliveryTime DateTime?
+  userId                Int
+  restaurantId          Int
+  courierId             Int?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  user       User        @relation("CustomerOrders", fields: [userId], references: [id], onDelete: Restrict)
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  courier    User?       @relation("CourierOrders", fields: [courierId], references: [id], onDelete: SetNull)
+  items      OrderItem[]
+
+  @@index([userId])
+  @@index([restaurantId])
+  @@index([courierId])
+  @@index([status])
+}
+
+model OrderItem {
+  id              Int     @id @default(autoincrement())
+  quantity        Int
+  priceAtPurchase Decimal @db.Decimal(10, 2)
+  orderId         Int
+  mealId          Int
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  meal  Meal  @relation(fields: [mealId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([mealId])
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  userId    Int
+  mealId    Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mealId])
+  @@index([userId])
+  @@index([mealId])
+}
