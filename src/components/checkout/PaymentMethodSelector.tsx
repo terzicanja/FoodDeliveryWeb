@@ -1,0 +1,71 @@
+"use client";
+
+export type CheckoutPaymentMethod = "CASH";
+
+const PAYMENT_OPTIONS: Array<{
+  value: CheckoutPaymentMethod;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "CASH",
+    label: "Cash on Delivery",
+    description: "Pay the courier when your order arrives.",
+  },
+];
+
+type PaymentMethodSelectorProps = {
+  value: CheckoutPaymentMethod;
+  onChange: (value: CheckoutPaymentMethod) => void;
+};
+
+export function PaymentMethodSelector({
+  value,
+  onChange,
+}: PaymentMethodSelectorProps) {
+  return (
+    <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+        Payment method
+      </h2>
+      <p className="mt-1 text-sm text-zinc-500">
+        More payment options can be added later.
+      </p>
+
+      <fieldset className="mt-4 space-y-3">
+        <legend className="sr-only">Choose a payment method</legend>
+        {PAYMENT_OPTIONS.map((option) => {
+          const selected = value === option.value;
+
+          return (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${
+                selected
+                  ? "border-orange-400 bg-orange-50"
+                  : "border-zinc-200 hover:border-zinc-300"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value={option.value}
+                checked={selected}
+                onChange={() => onChange(option.value)}
+                className="mt-1 h-4 w-4 accent-orange-600"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-zinc-900">
+                  {option.label}
+                </span>
+                <span className="mt-1 block text-sm text-zinc-500">
+                  {option.description}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </fieldset>
+    </section>
+  );
+}

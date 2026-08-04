@@ -1,32 +1,21 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, verifyToken } from "@/lib/auth";
+import { getAuthPayload } from "@/lib/auth-request";
 import { prisma } from "@/lib/prisma";
 import { userPublicSelect } from "@/lib/user";
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+    const auth = await getAuthPayload();
 
-    if (!token) {
+    if (!auth) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 },
       );
     }
 
-    const payload = verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 },
-      );
-    }
-
     const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
+      where: { id: auth.userId },
       select: userPublicSelect,
     });
 
