@@ -8,6 +8,7 @@ import {
   fetchMyOrders,
   type CustomerOrderDto,
 } from "@/lib/api/orders-client";
+import type { OwnReviewDto } from "@/lib/api/reviews-client";
 
 type OrdersStatus = "loading" | "ready" | "unauthenticated" | "error";
 
@@ -49,6 +50,17 @@ export function OrdersView() {
       cancelled = true;
     };
   }, [router]);
+
+  const handleReviewCreated = (mealId: number, review: OwnReviewDto) => {
+    setOrders((current) =>
+      current.map((order) => ({
+        ...order,
+        items: order.items.map((item) =>
+          item.meal.id === mealId ? { ...item, review } : item,
+        ),
+      })),
+    );
+  };
 
   if (status === "loading" || status === "unauthenticated") {
     return (
@@ -103,7 +115,10 @@ export function OrdersView() {
       <ul className="space-y-4">
         {orders.map((order) => (
           <li key={order.id}>
-            <OrderCard order={order} />
+            <OrderCard
+              order={order}
+              onReviewCreated={handleReviewCreated}
+            />
           </li>
         ))}
       </ul>

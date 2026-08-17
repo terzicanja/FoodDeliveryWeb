@@ -27,3 +27,23 @@ export const createOrderSchema = z.object({
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum([
+    "PENDING",
+    "ACCEPTED",
+    "PREPARING",
+    "READY",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "REJECTED",
+  ]),
+});
+
+export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+
+export const courierDeliverOrderSchema = z.object({
+  status: z.literal("DELIVERED"),
+});
+
+export type CourierDeliverOrderInput = z.infer<typeof courierDeliverOrderSchema>;

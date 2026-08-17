@@ -15,6 +15,15 @@ export function formatPaymentMethod(method: PaymentMethod | string): string {
   );
 }
 
+export function formatMealPrice(
+  price: number | string | { toString(): string },
+): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "EUR",
+  }).format(Number(price));
+}
+
 export function formatOrderDate(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;
 

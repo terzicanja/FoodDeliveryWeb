@@ -1,14 +1,18 @@
 import Image from "next/image";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
+import { OrderItemReview } from "@/components/reviews/OrderItemReview";
 import type { CustomerOrderDto } from "@/lib/api/orders-client";
+import type { OwnReviewDto } from "@/lib/api/reviews-client";
 import { formatOrderDate, formatPaymentMethod } from "@/lib/format";
 import { formatMealPrice } from "@/lib/restaurants";
 
 type OrderCardProps = {
   order: CustomerOrderDto;
+  onReviewCreated?: (mealId: number, review: OwnReviewDto) => void;
 };
 
-export function OrderCard({ order }: OrderCardProps) {
+export function OrderCard({ order, onReviewCreated }: OrderCardProps) {
+  const isDelivered = order.status === "DELIVERED";
   return (
     <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -46,7 +50,7 @@ export function OrderCard({ order }: OrderCardProps) {
         {order.items.map((item) => (
           <li
             key={`${order.id}-${item.meal.id}`}
-            className="flex items-center gap-3 py-3"
+            className="flex items-start gap-3 py-3"
           >
             <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-100">
               {item.meal.image ? (
@@ -71,6 +75,15 @@ export function OrderCard({ order }: OrderCardProps) {
               <p className="mt-0.5 text-sm text-zinc-500">
                 Qty {item.quantity}
               </p>
+              {isDelivered ? (
+                <OrderItemReview
+                  mealId={item.meal.id}
+                  existingReview={item.review}
+                  onReviewCreated={(review) => {
+                    onReviewCreated?.(item.meal.id, review);
+                  }}
+                />
+              ) : null}
             </div>
 
             <p className="shrink-0 text-sm font-semibold text-zinc-900">

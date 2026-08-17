@@ -1,5 +1,20 @@
-import type { Prisma, RestaurantType } from "@prisma/client";
+import { RestaurantType, type Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  EMPTY_RATING_SUMMARY,
+  getMealRatingSummaries,
+  getRestaurantRating,
+  getRestaurantRatings,
+  type RatingSummary,
+} from "@/lib/reviews";
+import {
+  DEFAULT_RESTAURANT_SORT,
+  formatRestaurantType,
+  RESTAURANT_TYPE_OPTIONS,
+  type RestaurantSort,
+} from "@/lib/validations/restaurants";
+
+export { formatRestaurantType };
 
 export const restaurantListSelect = {
   id: true,
@@ -19,25 +34,121 @@ export const mealListSelect = {
 
 export type RestaurantListItem = Prisma.RestaurantGetPayload<{
   select: typeof restaurantListSelect;
-}>;
+}> &
+  RatingSummary;
 
 export type MealListItem = Prisma.MealGetPayload<{
   select: typeof mealListSelect;
 }>;
 
-export type RestaurantDetail = RestaurantListItem & {
-  meals: MealListItem[];
+export type MealWithRating = MealListItem & RatingSummary;
+
+export type RestaurantDetail = Omit<RestaurantListItem, keyof RatingSummary> &
+  RatingSummary & {
+    meals: MealWithRating[];
+  };
+
+export type RestaurantQueryOptions = {
+  search?: string;
+  restaurantType?: RestaurantType;
+  sort?: RestaurantSort;
 };
 
+function compareRestaurantsByRating(
+  left: RestaurantListItem,
+  right: RestaurantListItem,
+  direction: "asc" | "desc",
+): number {
+  const leftRating = left.averageRating;
+  const rightRating = right.averageRating;
+
+  if (leftRating == null && rightRating == null) {
+    return left.name.localeCompare(right.name);
+  }
+
+  // Unrated restaurants always sort after rated ones.
+  if (leftRating == null) {
+    return 1;
+  }
+
+  if (rightRating == null) {
+    return -1;
+  }
+
+  const diff =
+    direction === "desc"
+      ? rightRating - leftRating
+      : leftRating - rightRating;
+
+  if (diff !== 0) {
+    return diff;
+  }
+
+  return left.name.localeCompare(right.name);
+}
+
 /**
- * Fetch all restaurants for listing views / public API.
- * Sorted alphabetically by name. Meals are intentionally omitted.
+ * Fetch restaurants for listing views / public API.
+ * Search matches name and description (case-insensitive, partial).
+ * Type filter matches restaurants that include the selected type.
+ * Name sorting is done in the database. Rating sorting uses calculated
+ * meal-review averages and keeps unrated restaurants after rated ones.
  */
-export async function getRestaurants(): Promise<RestaurantListItem[]> {
-  return prisma.restaurant.findMany({
+export async function getRestaurants(
+  options: RestaurantQueryOptions = {},
+): Promise<RestaurantListItem[]> {
+  const search = options.search?.trim() ?? "";
+  const sort = options.sort ?? DEFAULT_RESTAURANT_SORT;
+  const nameDirection = sort === "name-desc" ? "desc" : "asc";
+
+  const where: Prisma.RestaurantWhereInput = {};
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (options.restaurantType) {
+    where.restaurantTypes = { has: options.restaurantType };
+  }
+
+  const restaurants = await prisma.restaurant.findMany({
+    where,
     select: restaurantListSelect,
-    orderBy: { name: "asc" },
+    orderBy: { name: nameDirection },
   });
+
+  const ratings = await getRestaurantRatings(
+    restaurants.map((restaurant) => restaurant.id),
+  );
+
+  const withRatings = restaurants.map((restaurant) => ({
+    ...restaurant,
+    ...(ratings.get(restaurant.id) ?? EMPTY_RATING_SUMMARY),
+  }));
+
+  if (sort === "rating-desc") {
+    return [...withRatings].sort((left, right) =>
+      compareRestaurantsByRating(left, right, "desc"),
+    );
+  }
+
+  if (sort === "rating-asc") {
+    return [...withRatings].sort((left, right) =>
+      compareRestaurantsByRating(left, right, "asc"),
+    );
+  }
+
+  return withRatings;
+}
+
+export function getRestaurantTypeOptions(): Array<{
+  value: RestaurantType;
+  label: string;
+}> {
+  return RESTAURANT_TYPE_OPTIONS;
 }
 
 /**
@@ -51,7 +162,7 @@ export async function getRestaurantById(
     return null;
   }
 
-  return prisma.restaurant.findUnique({
+  const restaurant = await prisma.restaurant.findUnique({
     where: { id },
     select: {
       ...restaurantListSelect,
@@ -61,25 +172,25 @@ export async function getRestaurantById(
       },
     },
   });
+
+  if (!restaurant) {
+    return null;
+  }
+
+  const mealIds = restaurant.meals.map((meal) => meal.id);
+  const [restaurantRating, mealRatings] = await Promise.all([
+    getRestaurantRating(id),
+    getMealRatingSummaries(mealIds),
+  ]);
+
+  return {
+    ...restaurant,
+    ...restaurantRating,
+    meals: restaurant.meals.map((meal) => ({
+      ...meal,
+      ...(mealRatings.get(meal.id) ?? EMPTY_RATING_SUMMARY),
+    })),
+  };
 }
 
-const RESTAURANT_TYPE_LABELS: Record<RestaurantType, string> = {
-  ITALIAN: "Italian",
-  MEXICAN: "Mexican",
-  FAST_FOOD: "Fast Food",
-  CHINESE: "Chinese",
-  INDIAN: "Indian",
-};
-
-export function formatRestaurantType(type: RestaurantType): string {
-  return RESTAURANT_TYPE_LABELS[type] ?? type;
-}
-
-export function formatMealPrice(
-  price: MealListItem["price"] | number | string,
-): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "EUR",
-  }).format(Number(price));
-}
+export { formatMealPrice } from "@/lib/format";

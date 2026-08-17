@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Role } from "@prisma/client";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { MealList } from "@/components/restaurants/MealList";
 import { RestaurantHero } from "@/components/restaurants/RestaurantHero";
+import { RestaurantLocation } from "@/components/restaurants/RestaurantLocation";
+import { getAuthPayload } from "@/lib/auth-request";
+import { geocodeAddress } from "@/lib/geocoding";
+import {
+  getReviewEligibilityForUser,
+  getReviewsForMeals,
+} from "@/lib/reviews";
 import { getRestaurantById } from "@/lib/restaurants";
 
 type RestaurantPageProps = {
@@ -21,6 +29,21 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
   }
 
   const { meals, ...restaurantInfo } = restaurant;
+  const mealIds = meals.map((meal) => meal.id);
+  const auth = await getAuthPayload();
+
+  const [reviewsByMeal, eligibilityByMeal, coordinates] = await Promise.all([
+    getReviewsForMeals(mealIds),
+    auth?.role === Role.CUSTOMER
+      ? getReviewEligibilityForUser(auth.userId, mealIds)
+      : Promise.resolve(
+          new Map<
+            number,
+            { canReview: boolean; ownReview: null }
+          >(),
+        ),
+    geocodeAddress(restaurant.address),
+  ]);
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -38,6 +61,12 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
           <RestaurantHero restaurant={restaurantInfo} />
         </div>
 
+        <RestaurantLocation
+          name={restaurant.name}
+          address={restaurant.address}
+          coordinates={coordinates}
+        />
+
         <section className="mt-10">
           <div className="mb-6">
             <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
@@ -48,7 +77,12 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
             </p>
           </div>
 
-          <MealList meals={meals} restaurantId={restaurant.id} />
+          <MealList
+            meals={meals}
+            restaurantId={restaurant.id}
+            reviewsByMeal={reviewsByMeal}
+            eligibilityByMeal={eligibilityByMeal}
+          />
         </section>
       </main>
     </div>

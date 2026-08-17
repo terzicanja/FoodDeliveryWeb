@@ -13,6 +13,7 @@ export function SiteHeader() {
   const { itemCount, isReady } = useCart();
   const badgeCount = isReady ? itemCount : 0;
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -25,7 +26,15 @@ export function SiteHeader() {
         return;
       }
 
-      setAuthStatus(response.ok ? "authenticated" : "guest");
+      if (!response.ok) {
+        setAuthStatus("guest");
+        setUserRole(null);
+        return;
+      }
+
+      const body = (await response.json()) as { user: { role: string } };
+      setAuthStatus("authenticated");
+      setUserRole(body.user.role);
     }
 
     void loadAuth();
@@ -45,6 +54,7 @@ export function SiteHeader() {
     try {
       await logoutUser();
       setAuthStatus("guest");
+      setUserRole(null);
       router.push("/");
       router.refresh();
     } finally {
@@ -63,6 +73,24 @@ export function SiteHeader() {
         </Link>
 
         <nav className="flex items-center gap-1.5 text-sm sm:gap-3">
+          {authStatus === "authenticated" && userRole === "ADMIN" ? (
+            <Link
+              href="/admin"
+              className="rounded-lg px-2.5 py-2 font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 sm:px-3"
+            >
+              Admin
+            </Link>
+          ) : null}
+
+          {authStatus === "authenticated" && userRole === "COURIER" ? (
+            <Link
+              href="/courier"
+              className="rounded-lg px-2.5 py-2 font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 sm:px-3"
+            >
+              Courier
+            </Link>
+          ) : null}
+
           {authStatus === "authenticated" ? (
             <Link
               href="/orders"

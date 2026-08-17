@@ -69,6 +69,12 @@ export type CustomerOrderDto = {
       name: string;
       image: string | null;
     };
+    review: {
+      id: number;
+      rating: number;
+      comment: string | null;
+      createdAt: string;
+    } | null;
   }>;
 };
 

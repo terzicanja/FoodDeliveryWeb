@@ -1,13 +1,24 @@
-import Image from "next/image";
 import { AddToCartButton } from "@/components/cart/AddToCartButton";
-import { formatMealPrice, type MealListItem } from "@/lib/restaurants";
+import { MealReviewSection } from "@/components/reviews/MealReviewSection";
+import type { OwnReview, PublicReview } from "@/lib/reviews";
+import { formatMealPrice, type MealWithRating } from "@/lib/restaurants";
+import Image from "next/image";
 
 type MealCardProps = {
-  meal: MealListItem;
+  meal: MealWithRating;
   restaurantId: number;
+  reviews: PublicReview[];
+  canReview: boolean;
+  ownReview: OwnReview | null;
 };
 
-export function MealCard({ meal, restaurantId }: MealCardProps) {
+export function MealCard({
+  meal,
+  restaurantId,
+  reviews,
+  canReview,
+  ownReview,
+}: MealCardProps) {
   const imageUrl = meal.images[0] ?? null;
 
   return (
@@ -39,21 +50,34 @@ export function MealCard({ meal, restaurantId }: MealCardProps) {
           </p>
         </div>
 
-        <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-600">
+        <p className="mt-2 text-sm leading-relaxed text-zinc-600">
           {meal.description?.trim()
             ? meal.description
             : "No description available."}
         </p>
 
-        <AddToCartButton
-          item={{
-            mealId: meal.id,
-            restaurantId,
-            name: meal.name,
-            price: Number(meal.price),
-            image: imageUrl,
-          }}
-        />
+        <div className="mt-auto">
+          <AddToCartButton
+            item={{
+              mealId: meal.id,
+              restaurantId,
+              name: meal.name,
+              price: Number(meal.price),
+              image: imageUrl,
+            }}
+          />
+
+          <MealReviewSection
+            mealId={meal.id}
+            rating={{
+              averageRating: meal.averageRating,
+              reviewCount: meal.reviewCount,
+            }}
+            reviews={reviews}
+            canReview={canReview}
+            ownReview={ownReview}
+          />
+        </div>
       </div>
     </article>
   );

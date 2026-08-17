@@ -1,3 +1,4 @@
+import { RatingSummaryDisplay } from "@/components/reviews/RatingSummary";
 import {
   formatRestaurantType,
   type RestaurantDetail,
@@ -24,6 +25,13 @@ export function RestaurantHero({ restaurant }: RestaurantHeroProps) {
       <h1 className="mt-4 text-3xl font-semibold tracking-tight text-zinc-900 sm:text-4xl">
         {restaurant.name}
       </h1>
+
+      <div className="mt-3">
+        <RatingSummaryDisplay
+          averageRating={restaurant.averageRating}
+          reviewCount={restaurant.reviewCount}
+        />
+      </div>
 
       <p className="mt-3 max-w-3xl text-base leading-relaxed text-zinc-600">
         {restaurant.description?.trim()

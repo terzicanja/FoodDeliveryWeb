@@ -1,10 +1,33 @@
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { RestaurantFilters } from "@/components/restaurants/RestaurantFilters";
 import { RestaurantList } from "@/components/restaurants/RestaurantList";
-import { getRestaurants } from "@/lib/restaurants";
+import {
+  getRestaurants,
+  getRestaurantTypeOptions,
+} from "@/lib/restaurants";
+import {
+  isRestaurantQueryActive,
+  parseRestaurantQuery,
+} from "@/lib/validations/restaurants";
 
-export default async function HomePage() {
-  // Server Component: query the database directly during the request (SSR).
-  const restaurants = await getRestaurants();
+type HomePageProps = {
+  searchParams: Promise<{
+    search?: string;
+    type?: string;
+    sort?: string;
+  }>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const rawParams = await searchParams;
+  const query = parseRestaurantQuery(rawParams);
+  const isActive = isRestaurantQueryActive(query);
+
+  const restaurants = await getRestaurants({
+    search: query.search,
+    restaurantType: query.type,
+    sort: query.sort,
+  });
 
   return (
     <div className="min-h-screen bg-zinc-50">
@@ -20,7 +43,18 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <RestaurantList restaurants={restaurants} />
+        <div className="mb-8">
+          <RestaurantFilters
+            key={`${query.search ?? ""}-${query.type ?? ""}-${query.sort}`}
+            search={query.search ?? ""}
+            type={query.type ?? ""}
+            sort={query.sort}
+            typeOptions={getRestaurantTypeOptions()}
+            isActive={isActive}
+          />
+        </div>
+
+        <RestaurantList restaurants={restaurants} hasActiveFilters={isActive} />
       </main>
     </div>
   );

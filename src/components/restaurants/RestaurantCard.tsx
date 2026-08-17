@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RatingSummaryDisplay } from "@/components/reviews/RatingSummary";
 import {
   formatRestaurantType,
   type RestaurantListItem,
@@ -36,6 +37,13 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
       </p>
 
       <p className="mt-4 text-sm text-zinc-500">{restaurant.address}</p>
+
+      <div className="mt-3">
+        <RatingSummaryDisplay
+          averageRating={restaurant.averageRating}
+          reviewCount={restaurant.reviewCount}
+        />
+      </div>
     </Link>
   );
 }

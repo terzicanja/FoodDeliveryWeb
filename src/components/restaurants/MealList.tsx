@@ -1,12 +1,23 @@
 import { MealCard } from "@/components/restaurants/MealCard";
-import type { MealListItem } from "@/lib/restaurants";
+import type { OwnReview, PublicReview } from "@/lib/reviews";
+import type { MealWithRating } from "@/lib/restaurants";
 
 type MealListProps = {
-  meals: MealListItem[];
+  meals: MealWithRating[];
   restaurantId: number;
+  reviewsByMeal: Map<number, PublicReview[]>;
+  eligibilityByMeal: Map<
+    number,
+    { canReview: boolean; ownReview: OwnReview | null }
+  >;
 };
 
-export function MealList({ meals, restaurantId }: MealListProps) {
+export function MealList({
+  meals,
+  restaurantId,
+  reviewsByMeal,
+  eligibilityByMeal,
+}: MealListProps) {
   if (meals.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
@@ -20,11 +31,21 @@ export function MealList({ meals, restaurantId }: MealListProps) {
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {meals.map((meal) => (
-        <li key={meal.id}>
-          <MealCard meal={meal} restaurantId={restaurantId} />
-        </li>
-      ))}
+      {meals.map((meal) => {
+        const eligibility = eligibilityByMeal.get(meal.id);
+
+        return (
+          <li key={meal.id}>
+            <MealCard
+              meal={meal}
+              restaurantId={restaurantId}
+              reviews={reviewsByMeal.get(meal.id) ?? []}
+              canReview={eligibility?.canReview ?? false}
+              ownReview={eligibility?.ownReview ?? null}
+            />
+          </li>
+        );
+      })}
     </ul>
   );
 }
