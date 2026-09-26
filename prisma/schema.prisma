@@ -9,8 +9,9 @@ datasource db {
 
 enum Role {
   CUSTOMER
-  ADMIN
+  RESTAURANT
   COURIER
+  ADMIN
 }
 
 enum RestaurantType {
@@ -29,10 +30,26 @@ enum OrderStatus {
   OUT_FOR_DELIVERY
   DELIVERED
   REJECTED
+  CANCELLED
+  FAILED
+  PICKED_UP
+}
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
 }
 
 enum PaymentMethod {
-  CASH
+  CASH_ON_DELIVERY
+  CARD_ON_DELIVERY
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
 }
 
 model User {
@@ -47,9 +64,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  orders        Order[]  @relation("CustomerOrders")
-  courierOrders Order[]  @relation("CourierOrders")
-  reviews       Review[]
+  orders          Order[]      @relation("CustomerOrders")
+  courierOrders   Order[]      @relation("CourierOrders")
+  reviews         Review[]
+  ownedRestaurant Restaurant?  @relation("RestaurantOwner")
 
   @@index([role])
 }
@@ -59,10 +77,15 @@ model Restaurant {
   name            String
   description     String?
   address         String
+  latitude        Float?
+  longitude       Float?
   restaurantTypes RestaurantType[]
+  imageUrl        String?
+  ownerId         Int?             @unique
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  owner  User?    @relation("RestaurantOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   meals  Meal[]
   orders Order[]
 }
@@ -85,17 +108,22 @@ model Meal {
 }
 
 model Order {
-  id                    Int           @id @default(autoincrement())
-  status                OrderStatus   @default(PENDING)
-  paymentMethod         PaymentMethod @default(CASH)
-  totalPrice            Decimal       @db.Decimal(10, 2)
-  orderAddress          String
-  estimatedDeliveryTime DateTime?
-  userId                Int
-  restaurantId          Int
-  courierId             Int?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                      Int              @id @default(autoincrement())
+  status                  OrderStatus      @default(PENDING)
+  fulfillmentType         FulfillmentType  @default(DELIVERY)
+  paymentMethod           PaymentMethod    @default(CASH_ON_DELIVERY)
+  paymentStatus           PaymentStatus    @default(PENDING)
+  stripeCheckoutSessionId String?          @unique
+  totalPrice              Decimal          @db.Decimal(10, 2)
+  orderAddress            String
+  estimatedDeliveryTime   Int?
+  note                    String?
+  failureNote             String?
+  userId                  Int
+  restaurantId            Int
+  courierId               Int?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   user       User        @relation("CustomerOrders", fields: [userId], references: [id], onDelete: Restrict)
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Restrict)

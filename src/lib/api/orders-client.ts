@@ -1,4 +1,5 @@
 import { parseApiError } from "@/lib/api/auth-client";
+import type { CreateOrderInput } from "@/lib/validations/orders";
 
 export type CreatedOrderResponse = {
   id: number;
@@ -8,8 +9,11 @@ export type CreatedOrderResponse = {
 };
 
 export type CreateOrderRequest = {
+  restaurantId: number;
   deliveryAddress: string;
-  paymentMethod: "CASH";
+  fulfillmentType: CreateOrderInput["fulfillmentType"];
+  paymentMethod: CreateOrderInput["paymentMethod"];
+  note?: string | null;
   items: Array<{
     mealId: string;
     quantity: number;
@@ -54,9 +58,13 @@ export type CustomerOrderDto = {
   id: number;
   status: string;
   totalPrice: string | number;
+  fulfillmentType: string;
   paymentMethod: string;
+  paymentStatus: string;
   createdAt: string;
-  estimatedDeliveryTime: string | null;
+  estimatedDeliveryTime: number | null;
+  note: string | null;
+  failureNote: string | null;
   restaurant: {
     id: number;
     name: string;
@@ -102,3 +110,25 @@ export async function fetchMyOrders() {
   };
 }
 
+export async function cancelMyOrder(orderId: number) {
+  const response = await fetch(`/api/orders/${orderId}/cancel`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errorBody = await parseApiError(response);
+    return {
+      ok: false as const,
+      status: response.status,
+      error: errorBody.error ?? "Could not cancel the order.",
+    };
+  }
+
+  const body = (await response.json()) as { order: CustomerOrderDto };
+
+  return {
+    ok: true as const,
+    order: body.order,
+  };
+}

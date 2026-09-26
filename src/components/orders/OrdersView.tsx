@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { OrderCard } from "@/components/orders/OrderCard";
 import {
+  cancelMyOrder,
   fetchMyOrders,
   type CustomerOrderDto,
 } from "@/lib/api/orders-client";
@@ -17,6 +18,10 @@ export function OrdersView() {
   const [status, setStatus] = useState<OrdersStatus>("loading");
   const [orders, setOrders] = useState<CustomerOrderDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(
+    null,
+  );
+  const [cancelErrors, setCancelErrors] = useState<Record<number, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +65,42 @@ export function OrdersView() {
         ),
       })),
     );
+  };
+
+  const handleCancel = async (orderId: number) => {
+    if (cancellingOrderId !== null) {
+      return;
+    }
+
+    setCancellingOrderId(orderId);
+    setCancelErrors((current) => {
+      const next = { ...current };
+      delete next[orderId];
+      return next;
+    });
+
+    try {
+      const result = await cancelMyOrder(orderId);
+
+      if (!result.ok) {
+        setCancelErrors((current) => ({
+          ...current,
+          [orderId]: result.error,
+        }));
+        return;
+      }
+
+      setOrders((current) =>
+        current.map((order) => (order.id === orderId ? result.order : order)),
+      );
+    } catch {
+      setCancelErrors((current) => ({
+        ...current,
+        [orderId]: "Could not cancel the order.",
+      }));
+    } finally {
+      setCancellingOrderId(null);
+    }
   };
 
   if (status === "loading" || status === "unauthenticated") {
@@ -118,6 +159,11 @@ export function OrdersView() {
             <OrderCard
               order={order}
               onReviewCreated={handleReviewCreated}
+              onCancel={(orderId) => {
+                void handleCancel(orderId);
+              }}
+              isCancelling={cancellingOrderId === order.id}
+              cancelError={cancelErrors[order.id] ?? null}
             />
           </li>
         ))}

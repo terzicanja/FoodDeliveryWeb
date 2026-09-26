@@ -3,16 +3,38 @@ import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import { OrderItemReview } from "@/components/reviews/OrderItemReview";
 import type { CustomerOrderDto } from "@/lib/api/orders-client";
 import type { OwnReviewDto } from "@/lib/api/reviews-client";
-import { formatOrderDate, formatPaymentMethod } from "@/lib/format";
+import {
+  formatEstimatedDeliveryTime,
+  formatFulfillmentType,
+  formatOrderDate,
+  formatPaymentMethod,
+  formatPaymentStatus,
+} from "@/lib/format";
+import {
+  canCustomerCancelOrder,
+  isReviewableOrderStatus,
+} from "@/lib/order-status";
 import { formatMealPrice } from "@/lib/restaurants";
+import { OrderStatus } from "@prisma/client";
 
 type OrderCardProps = {
   order: CustomerOrderDto;
   onReviewCreated?: (mealId: number, review: OwnReviewDto) => void;
+  onCancel?: (orderId: number) => void;
+  isCancelling?: boolean;
+  cancelError?: string | null;
 };
 
-export function OrderCard({ order, onReviewCreated }: OrderCardProps) {
-  const isDelivered = order.status === "DELIVERED";
+export function OrderCard({
+  order,
+  onReviewCreated,
+  onCancel,
+  isCancelling = false,
+  cancelError = null,
+}: OrderCardProps) {
+  const canReview = isReviewableOrderStatus(order.status);
+  const canCancel = canCustomerCancelOrder(order.status as OrderStatus);
+
   return (
     <article className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -29,22 +51,40 @@ export function OrderCard({ order, onReviewCreated }: OrderCardProps) {
           <p className="mt-1 text-sm text-zinc-500">
             Placed {formatOrderDate(order.createdAt)}
           </p>
+          <p className="mt-1 text-sm text-zinc-500">
+            {formatFulfillmentType(order.fulfillmentType)}
+          </p>
         </div>
 
         <div className="text-sm sm:text-right">
           <p className="text-zinc-500">
             {formatPaymentMethod(order.paymentMethod)}
           </p>
+          <p className="mt-1 text-zinc-500">
+            Payment {formatPaymentStatus(order.paymentStatus).toLowerCase()}
+          </p>
           <p className="mt-1 text-base font-semibold text-orange-700">
             {formatMealPrice(order.totalPrice)}
           </p>
-          {order.estimatedDeliveryTime ? (
+          {order.estimatedDeliveryTime != null ? (
             <p className="mt-1 text-zinc-500">
-              ETA {formatOrderDate(order.estimatedDeliveryTime)}
+              {formatEstimatedDeliveryTime(order.estimatedDeliveryTime)}
             </p>
           ) : null}
         </div>
       </div>
+
+      {order.note ? (
+        <p className="mt-4 rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+          Note: {order.note}
+        </p>
+      ) : null}
+
+      {order.failureNote ? (
+        <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Delivery failed: {order.failureNote}
+        </p>
+      ) : null}
 
       <ul className="mt-5 divide-y divide-zinc-100 border-t border-zinc-100">
         {order.items.map((item) => (
@@ -75,7 +115,7 @@ export function OrderCard({ order, onReviewCreated }: OrderCardProps) {
               <p className="mt-0.5 text-sm text-zinc-500">
                 Qty {item.quantity}
               </p>
-              {isDelivered ? (
+              {canReview ? (
                 <OrderItemReview
                   mealId={item.meal.id}
                   existingReview={item.review}
@@ -92,6 +132,27 @@ export function OrderCard({ order, onReviewCreated }: OrderCardProps) {
           </li>
         ))}
       </ul>
+
+      {canCancel && onCancel ? (
+        <div className="mt-4 border-t border-zinc-100 pt-4">
+          <button
+            type="button"
+            disabled={isCancelling}
+            onClick={() => onCancel(order.id)}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isCancelling ? "Cancelling..." : "Cancel order"}
+          </button>
+          {cancelError ? (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {cancelError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }

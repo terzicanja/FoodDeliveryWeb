@@ -1,13 +1,11 @@
 "use client";
 
-import { OrderStatus } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminAccessDenied } from "@/components/admin/AdminAccessDenied";
 import { AdminOrderCard } from "@/components/admin/AdminOrderCard";
 import {
   fetchAdminOrders,
-  updateAdminOrderStatus,
   type AdminOrderDto,
 } from "@/lib/api/admin-orders-client";
 
@@ -18,9 +16,6 @@ export function AdminOrdersView() {
   const [status, setStatus] = useState<ViewStatus>("loading");
   const [orders, setOrders] = useState<AdminOrderDto[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
-  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
-  const [actionErrors, setActionErrors] = useState<Record<number, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -60,47 +55,6 @@ export function AdminOrdersView() {
     };
   }, [router]);
 
-  const handleStatusChange = async (
-    orderId: number,
-    nextStatus: OrderStatus,
-  ) => {
-    if (updatingOrderId !== null) {
-      return;
-    }
-
-    setUpdatingOrderId(orderId);
-    setPendingStatus(nextStatus);
-    setActionErrors((current) => {
-      const next = { ...current };
-      delete next[orderId];
-      return next;
-    });
-
-    try {
-      const result = await updateAdminOrderStatus(orderId, nextStatus);
-
-      if (!result.ok) {
-        setActionErrors((current) => ({
-          ...current,
-          [orderId]: result.error,
-        }));
-        return;
-      }
-
-      setOrders((current) =>
-        current.map((order) => (order.id === orderId ? result.order : order)),
-      );
-    } catch {
-      setActionErrors((current) => ({
-        ...current,
-        [orderId]: "Could not update the order status.",
-      }));
-    } finally {
-      setUpdatingOrderId(null);
-      setPendingStatus(null);
-    }
-  };
-
   if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500">
@@ -132,7 +86,7 @@ export function AdminOrdersView() {
           Orders
         </h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Review incoming orders and move them through the kitchen workflow.
+          Admins cannot change order statuses.
         </p>
       </div>
 
@@ -149,17 +103,7 @@ export function AdminOrdersView() {
         <ul className="space-y-4">
           {orders.map((order) => (
             <li key={order.id}>
-              <AdminOrderCard
-                order={order}
-                isUpdating={updatingOrderId !== null}
-                pendingStatus={
-                  updatingOrderId === order.id ? pendingStatus : null
-                }
-                error={actionErrors[order.id] ?? null}
-                onStatusChange={(nextStatus) => {
-                  void handleStatusChange(order.id, nextStatus);
-                }}
-              />
+              <AdminOrderCard order={order} />
             </li>
           ))}
         </ul>

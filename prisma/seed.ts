@@ -1,6 +1,8 @@
 import {
+  FulfillmentType,
   OrderStatus,
   PaymentMethod,
+  PaymentStatus,
   PrismaClient,
   RestaurantType,
   Role,
@@ -14,6 +16,7 @@ const DEMO_PASSWORD = "Password123!";
 const SEED_USER_EMAILS = [
   "admin@fooddelivery.com",
   "courier@fooddelivery.com",
+  "restaurant@fooddelivery.com",
   "ana.kovac@email.com",
   "marko.horvat@email.com",
   "iva.babic@email.com",
@@ -39,6 +42,13 @@ type RestaurantSeed = {
   name: (typeof SEED_RESTAURANT_NAMES)[number];
   description: string;
   address: string;
+  /**
+   * WGS84 coordinates for the seed street address (Zagreb).
+   * Null allowed so Near Me can place restaurants without coords last.
+   */
+  latitude: number | null;
+  longitude: number | null;
+  imageUrl: string;
   restaurantTypes: RestaurantType[];
   meals: MealSeed[];
 };
@@ -49,6 +59,10 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "Family-run Italian kitchen serving handmade pasta, wood-fired pizza, and classic desserts.",
     address: "Ilica 42, 10000 Zagreb",
+    latitude: 45.81305,
+    longitude: 15.97725,
+    imageUrl:
+      "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800",
     restaurantTypes: [RestaurantType.ITALIAN],
     meals: [
       {
@@ -109,6 +123,10 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "Cantonese and Sichuan favorites with bold sauces and fresh wok-fried dishes.",
     address: "Vlaška 78, 10000 Zagreb",
+    latitude: 45.8148,
+    longitude: 16.0025,
+    imageUrl:
+      "https://images.unsplash.com/photo-1525755662778-989d0524087e?w=800",
     restaurantTypes: [RestaurantType.CHINESE],
     meals: [
       {
@@ -176,6 +194,10 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "Vibrant Mexican street food — tacos, burritos, and fresh salsas.",
     address: "Tkalčićeva 15, 10000 Zagreb",
+    latitude: 45.8155,
+    longitude: 15.9778,
+    imageUrl:
+      "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=800",
     restaurantTypes: [RestaurantType.MEXICAN, RestaurantType.FAST_FOOD],
     meals: [
       {
@@ -235,6 +257,10 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "North Indian and street-food classics with fragrant spices and fresh naan.",
     address: "Maksimirska 55, 10000 Zagreb",
+    latitude: 45.8165,
+    longitude: 16.0165,
+    imageUrl:
+      "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=800",
     restaurantTypes: [RestaurantType.INDIAN],
     meals: [
       {
@@ -310,6 +336,10 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "Smash burgers, loaded fries, and milkshakes made for quick comfort food.",
     address: "Savska cesta 120, 10000 Zagreb",
+    latitude: 45.7985,
+    longitude: 15.971,
+    imageUrl:
+      "https://images.unsplash.com/photo-1568901346375-23e4bf99c0c8?w=800",
     restaurantTypes: [RestaurantType.FAST_FOOD],
     meals: [
       {
@@ -377,6 +407,11 @@ const restaurantsSeed: RestaurantSeed[] = [
     description:
       "Fast Italian classics — pizza by the slice, panini, and fresh salads.",
     address: "Branimirova 29, 10000 Zagreb",
+    // Intentionally left without coordinates so Near Me can sort these last.
+    latitude: null,
+    longitude: null,
+    imageUrl:
+      "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=800",
     restaurantTypes: [RestaurantType.ITALIAN, RestaurantType.FAST_FOOD],
     meals: [
       {
@@ -437,10 +472,6 @@ function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
 
-function hoursFromNow(hours: number): Date {
-  return new Date(Date.now() + hours * 60 * 60 * 1000);
-}
-
 async function clearSeedData() {
   // Wipe only seed-owned rows, in FK-safe order, so re-runs stay idempotent.
   const seedOrderFilter = {
@@ -482,7 +513,7 @@ async function clearSeedData() {
 }
 
 async function seedUsers(passwordHash: string) {
-  const [admin, courier, ana, marko, iva] = await Promise.all([
+  const [admin, courier, restaurantOwner, ana, marko, iva] = await Promise.all([
     prisma.user.create({
       data: {
         firstName: "Luka",
@@ -503,6 +534,17 @@ async function seedUsers(passwordHash: string) {
         address: "Heinzelova 40, 10000 Zagreb",
         phone: "+385911000002",
         role: Role.COURIER,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        firstName: "Nina",
+        lastName: "Nonna",
+        email: "restaurant@fooddelivery.com",
+        passwordHash,
+        address: "Ilica 42, 10000 Zagreb",
+        phone: "+385911000003",
+        role: Role.RESTAURANT,
       },
     }),
     prisma.user.create({
@@ -540,10 +582,15 @@ async function seedUsers(passwordHash: string) {
     }),
   ]);
 
-  return { admin, courier, customers: [ana, marko, iva] as const };
+  return {
+    admin,
+    courier,
+    restaurantOwner,
+    customers: [ana, marko, iva] as const,
+  };
 }
 
-async function seedRestaurantsAndMeals() {
+async function seedRestaurantsAndMeals(ownerUserId: number) {
   const created = [];
 
   for (const restaurant of restaurantsSeed) {
@@ -552,7 +599,12 @@ async function seedRestaurantsAndMeals() {
         name: restaurant.name,
         description: restaurant.description,
         address: restaurant.address,
+        latitude: restaurant.latitude,
+        longitude: restaurant.longitude,
+        imageUrl: restaurant.imageUrl,
         restaurantTypes: restaurant.restaurantTypes,
+        ownerId:
+          restaurant.name === "Nonna's Trattoria" ? ownerUserId : undefined,
         meals: {
           create: restaurant.meals.map((meal) => ({
             name: meal.name,
@@ -594,18 +646,28 @@ async function seedOrders(
     customer: SeedCustomer;
     restaurant: SeedRestaurant;
     status: OrderStatus;
+    fulfillmentType: FulfillmentType;
+    paymentMethod: PaymentMethod;
+    paymentStatus: PaymentStatus;
     courierId: number | null;
     createdAt: Date;
-    estimatedDeliveryTime: Date | null;
+    estimatedDeliveryTime: number | null;
+    note: string | null;
+    failureNote: string | null;
     items: Array<{ mealName: string; quantity: number }>;
   }> = [
     {
       customer: ana,
       restaurant: nonna,
       status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
       createdAt: hoursAgo(72),
-      estimatedDeliveryTime: hoursAgo(70),
+      estimatedDeliveryTime: 40,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "Margherita Pizza", quantity: 1 },
         { mealName: "Tiramisu", quantity: 2 },
@@ -615,9 +677,14 @@ async function seedOrders(
       customer: marko,
       restaurant: dragon,
       status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CARD_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
       createdAt: hoursAgo(60),
-      estimatedDeliveryTime: hoursAgo(58),
+      estimatedDeliveryTime: 45,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "Kung Pao Chicken", quantity: 1 },
         { mealName: "Egg Fried Rice", quantity: 1 },
@@ -628,9 +695,14 @@ async function seedOrders(
       customer: iva,
       restaurant: casa,
       status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
       createdAt: hoursAgo(48),
-      estimatedDeliveryTime: hoursAgo(46),
+      estimatedDeliveryTime: 35,
+      note: "Bez luka",
+      failureNote: null,
       items: [
         { mealName: "Chicken Tacos", quantity: 2 },
         { mealName: "Guacamole & Chips", quantity: 1 },
@@ -640,9 +712,14 @@ async function seedOrders(
       customer: ana,
       restaurant: spice,
       status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CARD,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
       createdAt: hoursAgo(36),
-      estimatedDeliveryTime: hoursAgo(34),
+      estimatedDeliveryTime: 50,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "Butter Chicken", quantity: 1 },
         { mealName: "Garlic Naan", quantity: 2 },
@@ -653,9 +730,14 @@ async function seedOrders(
       customer: marko,
       restaurant: burger,
       status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
       createdAt: hoursAgo(30),
-      estimatedDeliveryTime: hoursAgo(28),
+      estimatedDeliveryTime: 30,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "BBQ Bacon Burger", quantity: 1 },
         { mealName: "Loaded Fries", quantity: 1 },
@@ -666,33 +748,65 @@ async function seedOrders(
       customer: iva,
       restaurant: bella,
       status: OrderStatus.DELIVERED,
-      courierId: null,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
+      courierId: courier.id,
       createdAt: hoursAgo(24),
-      estimatedDeliveryTime: hoursAgo(22),
+      estimatedDeliveryTime: 40,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "Four Cheese Pizza", quantity: 1 },
         { mealName: "Caesar Salad", quantity: 1 },
       ],
     },
     {
-      customer: ana,
-      restaurant: dragon,
-      status: OrderStatus.OUT_FOR_DELIVERY,
+      customer: marko,
+      restaurant: casa,
+      status: OrderStatus.DELIVERED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PAID,
       courierId: courier.id,
-      createdAt: hoursAgo(2),
-      estimatedDeliveryTime: hoursFromNow(0.5),
+      createdAt: hoursAgo(96),
+      estimatedDeliveryTime: 40,
+      note: null,
+      failureNote: null,
       items: [
-        { mealName: "Beef Chow Mein", quantity: 1 },
-        { mealName: "Hot and Sour Soup", quantity: 1 },
+        { mealName: "Beef Burrito", quantity: 1 },
+        { mealName: "Churros", quantity: 2 },
+      ],
+    },
+    {
+      customer: ana,
+      restaurant: nonna,
+      status: OrderStatus.PENDING,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
+      courierId: null,
+      createdAt: hoursAgo(0.2),
+      estimatedDeliveryTime: null,
+      note: "Bez luka i pozvoniti na interfon",
+      failureNote: null,
+      items: [
+        { mealName: "Lasagna al Forno", quantity: 1 },
+        { mealName: "Tiramisu", quantity: 1 },
       ],
     },
     {
       customer: marko,
       restaurant: nonna,
-      status: OrderStatus.PREPARING,
+      status: OrderStatus.READY,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CARD_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
       courierId: null,
       createdAt: hoursAgo(1),
-      estimatedDeliveryTime: hoursFromNow(1),
+      estimatedDeliveryTime: 40,
+      note: null,
+      failureNote: null,
       items: [
         { mealName: "Spaghetti Carbonara", quantity: 1 },
         { mealName: "Caprese Salad", quantity: 1 },
@@ -700,27 +814,85 @@ async function seedOrders(
     },
     {
       customer: iva,
-      restaurant: spice,
-      status: OrderStatus.PREPARING,
+      restaurant: nonna,
+      status: OrderStatus.READY,
+      fulfillmentType: FulfillmentType.PICKUP,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
       courierId: null,
       createdAt: hoursAgo(0.75),
-      estimatedDeliveryTime: hoursFromNow(1.25),
+      estimatedDeliveryTime: 25,
+      note: "Dolazim za 10 minuta",
+      failureNote: null,
       items: [
-        { mealName: "Chicken Tikka Masala", quantity: 1 },
-        { mealName: "Vegetable Samosas", quantity: 1 },
-        { mealName: "Garlic Naan", quantity: 1 },
+        { mealName: "Spaghetti Carbonara", quantity: 1 },
+        { mealName: "Tiramisu", quantity: 1 },
+      ],
+    },
+    {
+      customer: ana,
+      restaurant: nonna,
+      status: OrderStatus.ACCEPTED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
+      courierId: null,
+      createdAt: hoursAgo(0.4),
+      estimatedDeliveryTime: 40,
+      note: "Ostaviti ispred vrata",
+      failureNote: null,
+      items: [
+        { mealName: "Caprese Salad", quantity: 1 },
+        { mealName: "Lasagna al Forno", quantity: 1 },
       ],
     },
     {
       customer: marko,
-      restaurant: casa,
-      status: OrderStatus.DELIVERED,
+      restaurant: bella,
+      status: OrderStatus.FAILED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
       courierId: courier.id,
-      createdAt: hoursAgo(96),
-      estimatedDeliveryTime: hoursAgo(94),
+      createdAt: hoursAgo(5),
+      estimatedDeliveryTime: 40,
+      note: null,
+      failureNote: "Customer was not reachable at the delivery address.",
       items: [
-        { mealName: "Beef Burrito", quantity: 1 },
-        { mealName: "Churros", quantity: 2 },
+        { mealName: "Pepperoni Slice", quantity: 2 },
+        { mealName: "Panna Cotta", quantity: 1 },
+      ],
+    },
+    {
+      customer: iva,
+      restaurant: nonna,
+      status: OrderStatus.CANCELLED,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CARD,
+      paymentStatus: PaymentStatus.PENDING,
+      courierId: null,
+      createdAt: hoursAgo(3),
+      estimatedDeliveryTime: null,
+      note: null,
+      failureNote: null,
+      items: [
+        { mealName: "Lasagna al Forno", quantity: 1 },
+      ],
+    },
+    {
+      customer: ana,
+      restaurant: casa,
+      status: OrderStatus.OUT_FOR_DELIVERY,
+      fulfillmentType: FulfillmentType.DELIVERY,
+      paymentMethod: PaymentMethod.CASH_ON_DELIVERY,
+      paymentStatus: PaymentStatus.PENDING,
+      courierId: courier.id,
+      createdAt: hoursAgo(1.5),
+      estimatedDeliveryTime: 35,
+      note: null,
+      failureNote: null,
+      items: [
+        { mealName: "Quesadilla", quantity: 1 },
       ],
     },
   ];
@@ -755,10 +927,14 @@ async function seedOrders(
     const order = await prisma.order.create({
       data: {
         status: def.status,
-        paymentMethod: PaymentMethod.CASH,
+        fulfillmentType: def.fulfillmentType,
+        paymentMethod: def.paymentMethod,
+        paymentStatus: def.paymentStatus,
         totalPrice,
         orderAddress: def.customer.address,
         estimatedDeliveryTime: def.estimatedDeliveryTime,
+        note: def.note,
+        failureNote: def.failureNote,
         userId: def.customer.id,
         restaurantId: def.restaurant.id,
         courierId: def.courierId,
@@ -892,17 +1068,18 @@ async function main() {
   await clearSeedData();
 
   // ---------------------------------------------------------------------------
-  // Users (1 admin, 1 courier, 3 customers)
+  // Users (1 admin, 1 courier, 1 restaurant, 3 customers)
   // ---------------------------------------------------------------------------
   console.log("Creating users...");
   const passwordHash = await hashPassword(DEMO_PASSWORD);
-  const { admin, courier, customers } = await seedUsers(passwordHash);
+  const { admin, courier, restaurantOwner, customers } =
+    await seedUsers(passwordHash);
 
   // ---------------------------------------------------------------------------
   // Restaurants + meals
   // ---------------------------------------------------------------------------
   console.log("Creating restaurants and meals...");
-  const restaurants = await seedRestaurantsAndMeals();
+  const restaurants = await seedRestaurantsAndMeals(restaurantOwner.id);
 
   // ---------------------------------------------------------------------------
   // Orders + order items
@@ -917,10 +1094,11 @@ async function main() {
   await seedReviews(orders);
 
   console.log("Seed completed successfully.");
-  console.log(`  Admin:    ${admin.email}`);
-  console.log(`  Courier:  ${courier.email}`);
+  console.log(`  Admin:      ${admin.email}`);
+  console.log(`  Courier:    ${courier.email}`);
+  console.log(`  Restaurant: ${restaurantOwner.email}`);
   console.log(
-    `  Customers: ${customers.map((customer) => customer.email).join(", ")}`,
+    `  Customers:  ${customers.map((customer) => customer.email).join(", ")}`,
   );
   console.log(`  Password for all demo users: ${DEMO_PASSWORD}`);
   console.log(`  Restaurants: ${restaurants.length}`);

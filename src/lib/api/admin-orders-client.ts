@@ -4,9 +4,13 @@ export type AdminOrderDto = {
   id: number;
   status: string;
   totalPrice: string | number;
+  fulfillmentType: string;
   paymentMethod: string;
+  paymentStatus: string;
   createdAt: string;
-  estimatedDeliveryTime: string | null;
+  estimatedDeliveryTime: number | null;
+  note: string | null;
+  failureNote: string | null;
   orderAddress: string;
   customer: {
     id: number;
@@ -55,33 +59,5 @@ export async function fetchAdminOrders() {
   return {
     ok: true as const,
     orders: body.orders,
-  };
-}
-
-export async function updateAdminOrderStatus(
-  orderId: number,
-  status: string,
-) {
-  const response = await fetch(`/api/admin/orders/${orderId}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ status }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await parseApiError(response);
-    return {
-      ok: false as const,
-      status: response.status,
-      error: errorBody.error ?? "Could not update the order status.",
-    };
-  }
-
-  const body = (await response.json()) as { order: AdminOrderDto };
-
-  return {
-    ok: true as const,
-    order: body.order,
   };
 }

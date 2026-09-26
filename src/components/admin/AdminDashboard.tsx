@@ -1,20 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { AdminOrdersView } from "@/components/admin/AdminOrdersView";
 import { AdminRestaurantsView } from "@/components/admin/AdminRestaurantsView";
 import { AdminUsersView } from "@/components/admin/AdminUsersView";
 
-type AdminTab = "orders" | "restaurants" | "users";
+type AdminTab = "restaurants" | "users";
 
 const TABS: Array<{ id: AdminTab; label: string }> = [
-  { id: "orders", label: "Orders" },
   { id: "restaurants", label: "Restaurants" },
   { id: "users", label: "Users" },
 ];
 
 export function AdminDashboard() {
-  const [tab, setTab] = useState<AdminTab>("orders");
+  const [tab, setTab] = useState<AdminTab>("restaurants");
 
   return (
     <div className="space-y-8">
@@ -23,7 +21,7 @@ export function AdminDashboard() {
           Admin dashboard
         </h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Manage orders, restaurants, meals, and users.
+          Manage users and restaurants. Meals and orders are not managed here.
         </p>
       </div>
 
@@ -54,7 +52,6 @@ export function AdminDashboard() {
         })}
       </div>
 
-      {tab === "orders" ? <AdminOrdersView /> : null}
       {tab === "restaurants" ? <AdminRestaurantsView /> : null}
       {tab === "users" ? <AdminUsersView /> : null}
     </div>

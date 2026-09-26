@@ -1,25 +1,37 @@
 "use client";
 
+import { useState } from "react";
+import { FailDeliveryDialog } from "@/components/courier/FailDeliveryDialog";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import type { CourierOrderDto } from "@/lib/api/courier-orders-client";
-import { formatOrderDate, formatPaymentMethod } from "@/lib/format";
+import {
+  formatEstimatedDeliveryTime,
+  formatFulfillmentType,
+  formatOrderDate,
+  formatPaymentMethod,
+} from "@/lib/format";
 import { formatMealPrice } from "@/lib/restaurants";
 
 type CourierOrderCardProps = {
   order: CourierOrderDto;
-  actionLabel: string;
+  mode: "available" | "active";
   isUpdating: boolean;
   error: string | null;
-  onAction: () => void;
+  onAccept?: () => void;
+  onDeliver?: () => void;
+  onFail?: (failureNote: string) => void;
 };
 
 export function CourierOrderCard({
   order,
-  actionLabel,
+  mode,
   isUpdating,
   error,
-  onAction,
+  onAccept,
+  onDeliver,
+  onFail,
 }: CourierOrderCardProps) {
+  const [showFailDialog, setShowFailDialog] = useState(false);
   const customerName = `${order.customer.firstName} ${order.customer.lastName}`;
 
   return (
@@ -45,14 +57,17 @@ export function CourierOrderCard({
 
         <div className="text-sm sm:text-right">
           <p className="text-zinc-500">
+            {formatFulfillmentType(order.fulfillmentType)}
+          </p>
+          <p className="mt-1 text-zinc-500">
             {formatPaymentMethod(order.paymentMethod)}
           </p>
           <p className="mt-1 text-base font-semibold text-orange-700">
             {formatMealPrice(order.totalPrice)}
           </p>
-          {order.estimatedDeliveryTime ? (
+          {order.estimatedDeliveryTime != null ? (
             <p className="mt-1 text-zinc-500">
-              ETA {formatOrderDate(order.estimatedDeliveryTime)}
+              {formatEstimatedDeliveryTime(order.estimatedDeliveryTime)}
             </p>
           ) : null}
         </div>
@@ -69,6 +84,12 @@ export function CourierOrderCard({
           <dd className="mt-0.5 text-zinc-900">{order.orderAddress}</dd>
         </div>
       </dl>
+
+      {order.note ? (
+        <p className="mt-4 rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+          Order note: {order.note}
+        </p>
+      ) : null}
 
       <ul className="mt-4 divide-y divide-zinc-100 border-t border-zinc-100">
         {order.items.map((item, index) => (
@@ -91,24 +112,64 @@ export function CourierOrderCard({
         ))}
       </ul>
 
-      <div className="mt-4 border-t border-zinc-100 pt-4">
-        <button
-          type="button"
-          disabled={isUpdating}
-          onClick={onAction}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isUpdating ? "Updating..." : actionLabel}
-        </button>
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
+        {mode === "available" && onAccept ? (
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={onAccept}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isUpdating ? "Updating..." : "Accept delivery"}
+          </button>
+        ) : null}
+
+        {mode === "active" && onDeliver ? (
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={onDeliver}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isUpdating ? "Updating..." : "Mark as delivered"}
+          </button>
+        ) : null}
+
+        {mode === "active" && onFail ? (
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => setShowFailDialog(true)}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Mark delivery as failed
+          </button>
+        ) : null}
       </div>
 
-      {error ? (
+      {error && !showFailDialog ? (
         <p
           role="alert"
           className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
         >
           {error}
         </p>
+      ) : null}
+
+      {onFail ? (
+        <FailDeliveryDialog
+          open={showFailDialog}
+          isSubmitting={isUpdating}
+          error={showFailDialog ? error : null}
+          onCancel={() => {
+            if (!isUpdating) {
+              setShowFailDialog(false);
+            }
+          }}
+          onConfirm={(failureNote) => {
+            onFail(failureNote);
+          }}
+        />
       ) : null}
     </article>
   );

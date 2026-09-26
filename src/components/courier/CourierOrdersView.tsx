@@ -8,6 +8,7 @@ import {
   acceptCourierDelivery,
   fetchCourierOrders,
   markCourierOrderDelivered,
+  markCourierOrderFailed,
   type CourierOrderDto,
 } from "@/lib/api/courier-orders-client";
 
@@ -130,6 +131,36 @@ export function CourierOrdersView() {
     }
   };
 
+  const handleFail = async (orderId: number, failureNote: string) => {
+    if (updatingOrderId !== null) {
+      return;
+    }
+
+    setUpdatingOrderId(orderId);
+    clearActionError(orderId);
+
+    try {
+      const result = await markCourierOrderFailed(orderId, failureNote);
+
+      if (!result.ok) {
+        setActionErrors((current) => ({
+          ...current,
+          [orderId]: result.error,
+        }));
+        return;
+      }
+
+      setMyOrders((current) => current.filter((order) => order.id !== orderId));
+    } catch {
+      setActionErrors((current) => ({
+        ...current,
+        [orderId]: "Could not mark this delivery as failed.",
+      }));
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
   if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500">
@@ -161,7 +192,8 @@ export function CourierOrdersView() {
           Courier dashboard
         </h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Accept ready orders and mark your active deliveries as complete.
+          Accept ready orders, complete deliveries, or mark a delivery as
+          failed when it cannot be completed.
         </p>
       </div>
 
@@ -187,10 +219,10 @@ export function CourierOrdersView() {
               <li key={order.id}>
                 <CourierOrderCard
                   order={order}
-                  actionLabel="Accept delivery"
+                  mode="available"
                   isUpdating={updatingOrderId !== null}
                   error={actionErrors[order.id] ?? null}
-                  onAction={() => {
+                  onAccept={() => {
                     void handleAccept(order.id);
                   }}
                 />
@@ -222,11 +254,14 @@ export function CourierOrdersView() {
               <li key={order.id}>
                 <CourierOrderCard
                   order={order}
-                  actionLabel="Mark as delivered"
-                  isUpdating={updatingOrderId !== null}
+                  mode="active"
+                  isUpdating={updatingOrderId === order.id}
                   error={actionErrors[order.id] ?? null}
-                  onAction={() => {
+                  onDeliver={() => {
                     void handleDeliver(order.id);
+                  }}
+                  onFail={(failureNote) => {
+                    void handleFail(order.id, failureNote);
                   }}
                 />
               </li>

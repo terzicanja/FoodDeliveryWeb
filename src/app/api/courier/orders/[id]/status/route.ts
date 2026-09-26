@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { OrderStatus } from "@prisma/client";
 import { requireCourierAuth } from "@/lib/auth-request";
 import { CourierOrderError, deliverCourierOrder } from "@/lib/orders";
 import { courierDeliverOrderSchema } from "@/lib/validations/orders";
@@ -61,7 +62,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     const order = await deliverCourierOrder({
       orderId,
       courierId: courier.auth.userId,
-      nextStatus: parsed.data.status,
+      nextStatus:
+        parsed.data.status === "FAILED"
+          ? OrderStatus.FAILED
+          : OrderStatus.DELIVERED,
+      ...(parsed.data.status === "FAILED"
+        ? { failureNote: parsed.data.failureNote }
+        : {}),
     });
 
     return NextResponse.json({ order }, { status: 200 });

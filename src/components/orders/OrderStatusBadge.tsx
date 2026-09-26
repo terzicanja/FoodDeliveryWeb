@@ -8,6 +8,9 @@ const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
   OUT_FOR_DELIVERY: "bg-indigo-50 text-indigo-800 ring-indigo-200",
   DELIVERED: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   REJECTED: "bg-red-50 text-red-800 ring-red-200",
+  CANCELLED: "bg-zinc-100 text-zinc-700 ring-zinc-200",
+  FAILED: "bg-red-50 text-red-800 ring-red-200",
+  PICKED_UP: "bg-emerald-50 text-emerald-800 ring-emerald-200",
 };
 
 const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
@@ -18,6 +21,9 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   OUT_FOR_DELIVERY: "Out for delivery",
   DELIVERED: "Delivered",
   REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+  FAILED: "Delivery failed",
+  PICKED_UP: "Picked up",
 };
 
 type OrderStatusBadgeProps = {

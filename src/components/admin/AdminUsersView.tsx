@@ -9,13 +9,9 @@ import {
   fetchAdminUsers,
   type AdminUserDto,
 } from "@/lib/api/admin-client";
-import { formatOrderDate } from "@/lib/format";
+import { formatOrderDate, formatRole } from "@/lib/format";
 
 type ViewStatus = "loading" | "ready" | "unauthenticated" | "forbidden" | "error";
-
-function formatRole(role: string): string {
-  return role.charAt(0) + role.slice(1).toLowerCase();
-}
 
 function deletionBlockReason(user: AdminUserDto): string | null {
   if (user.isSelf) {

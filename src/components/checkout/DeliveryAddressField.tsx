@@ -5,6 +5,7 @@ type DeliveryAddressFieldProps = {
   onChange: (value: string) => void;
   error?: string | null;
   disabled?: boolean;
+  fulfillmentType?: "DELIVERY" | "PICKUP";
 };
 
 export function DeliveryAddressField({
@@ -12,14 +13,19 @@ export function DeliveryAddressField({
   onChange,
   error,
   disabled = false,
+  fulfillmentType = "DELIVERY",
 }: DeliveryAddressFieldProps) {
+  const isPickup = fulfillmentType === "PICKUP";
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
-        Delivery address
+        {isPickup ? "Contact address" : "Delivery address"}
       </h2>
       <p className="mt-1 text-sm text-zinc-500">
-        Pre-filled from your profile. Changes apply to this order only.
+        {isPickup
+          ? "Pre-filled from your profile. Used if the restaurant needs to reach you."
+          : "Pre-filled from your profile. Changes apply to this order only."}
       </p>
 
       <label className="mt-4 block">

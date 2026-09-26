@@ -1,6 +1,9 @@
 "use client";
 
-export type CheckoutPaymentMethod = "CASH";
+import type { PaymentMethod } from "@prisma/client";
+import { formatPaymentMethod } from "@/lib/format";
+
+export type CheckoutPaymentMethod = PaymentMethod;
 
 const PAYMENT_OPTIONS: Array<{
   value: CheckoutPaymentMethod;
@@ -8,9 +11,19 @@ const PAYMENT_OPTIONS: Array<{
   description: string;
 }> = [
   {
-    value: "CASH",
-    label: "Cash on Delivery",
-    description: "Pay the courier when your order arrives.",
+    value: "CASH_ON_DELIVERY",
+    label: formatPaymentMethod("CASH_ON_DELIVERY"),
+    description: "Pay cash to the courier when your order arrives.",
+  },
+  {
+    value: "CARD_ON_DELIVERY",
+    label: formatPaymentMethod("CARD_ON_DELIVERY"),
+    description: "Pay by card to the courier when your order arrives.",
+  },
+  {
+    value: "CARD",
+    label: formatPaymentMethod("CARD"),
+    description: "Pay securely by card on Stripe's checkout page.",
   },
 ];
 
@@ -29,7 +42,7 @@ export function PaymentMethodSelector({
         Payment method
       </h2>
       <p className="mt-1 text-sm text-zinc-500">
-        More payment options can be added later.
+        Choose how you want to pay for this order.
       </p>
 
       <fieldset className="mt-4 space-y-3">

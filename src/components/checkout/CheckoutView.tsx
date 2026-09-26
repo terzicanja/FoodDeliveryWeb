@@ -6,16 +6,23 @@ import { useEffect, useState } from "react";
 import { CheckoutOrderSummary } from "@/components/checkout/CheckoutOrderSummary";
 import { DeliveryAddressField } from "@/components/checkout/DeliveryAddressField";
 import {
+  FulfillmentTypeSelector,
+  type CheckoutFulfillmentType,
+} from "@/components/checkout/FulfillmentTypeSelector";
+import {
   PaymentMethodSelector,
   type CheckoutPaymentMethod,
 } from "@/components/checkout/PaymentMethodSelector";
 import { useCart } from "@/context/CartProvider";
 import { fetchCurrentUser } from "@/lib/api/auth-client";
+import { createStripeCheckoutRequest } from "@/lib/api/checkout-client";
 import {
   buildOrderSuccessHref,
   createOrderRequest,
 } from "@/lib/api/orders-client";
+import { getCartRestaurantId } from "@/lib/cart";
 import type { PublicUser } from "@/lib/user";
+import { ORDER_NOTE_MAX_LENGTH } from "@/lib/validations/orders";
 
 type CheckoutStatus = "loading" | "ready" | "unauthenticated";
 
@@ -26,8 +33,11 @@ export function CheckoutView() {
   const [status, setStatus] = useState<CheckoutStatus>("loading");
   const [user, setUser] = useState<PublicUser | null>(null);
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [fulfillmentType, setFulfillmentType] =
+    useState<CheckoutFulfillmentType>("DELIVERY");
   const [paymentMethod, setPaymentMethod] =
-    useState<CheckoutPaymentMethod>("CASH");
+    useState<CheckoutPaymentMethod>("CASH_ON_DELIVERY");
+  const [note, setNote] = useState("");
   const [addressError, setAddressError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,10 +90,21 @@ export function CheckoutView() {
       return;
     }
 
+    const restaurantId = getCartRestaurantId(items);
+
+    if (restaurantId === null) {
+      setFormError("Your cart is empty. Add meals before placing an order.");
+      return;
+    }
+
     const trimmedAddress = deliveryAddress.trim();
 
     if (!trimmedAddress) {
-      setAddressError("Delivery address is required.");
+      setAddressError(
+        fulfillmentType === "PICKUP"
+          ? "Contact address is required."
+          : "Delivery address is required.",
+      );
       return;
     }
 
@@ -94,15 +115,42 @@ export function CheckoutView() {
 
     setIsSubmitting(true);
 
+    const checkoutPayload = {
+      restaurantId,
+      deliveryAddress: trimmedAddress,
+      fulfillmentType,
+      paymentMethod,
+      note: note.trim() ? note.trim() : null,
+      items: items.map((item) => ({
+        mealId: String(item.mealId),
+        quantity: item.quantity,
+      })),
+    };
+
     try {
-      const result = await createOrderRequest({
-        deliveryAddress: trimmedAddress,
-        paymentMethod,
-        items: items.map((item) => ({
-          mealId: String(item.mealId),
-          quantity: item.quantity,
-        })),
-      });
+      if (paymentMethod === "CARD") {
+        const result = await createStripeCheckoutRequest(checkoutPayload);
+
+        if (!result.ok) {
+          if (result.status === 401) {
+            router.replace("/login?next=/checkout");
+            return;
+          }
+
+          setFormError(result.error);
+          return;
+        }
+
+        if (!result.url) {
+          setFormError("Could not start card checkout. Please try again.");
+          return;
+        }
+
+        window.location.assign(result.url);
+        return;
+      }
+
+      const result = await createOrderRequest(checkoutPayload);
 
       if (!result.ok) {
         if (result.status === 401) {
@@ -117,7 +165,11 @@ export function CheckoutView() {
       clearCart();
       router.push(buildOrderSuccessHref(result.order));
     } catch {
-      setFormError("Could not place your order. Please try again.");
+      setFormError(
+        paymentMethod === "CARD"
+          ? "Could not start card checkout. Please try again."
+          : "Could not place your order. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -165,17 +217,49 @@ export function CheckoutView() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-6">
+          <FulfillmentTypeSelector
+            value={fulfillmentType}
+            onChange={setFulfillmentType}
+          />
+
           <DeliveryAddressField
             value={deliveryAddress}
             onChange={setDeliveryAddress}
             error={addressError}
             disabled={isSubmitting}
+            fulfillmentType={fulfillmentType}
           />
 
           <PaymentMethodSelector
             value={paymentMethod}
             onChange={setPaymentMethod}
           />
+
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 className="text-lg font-semibold tracking-tight text-zinc-900">
+              Order note
+            </h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Optional instructions for the restaurant or courier.
+            </p>
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-zinc-700">
+                Note
+              </span>
+              <textarea
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                disabled={isSubmitting}
+                rows={3}
+                maxLength={ORDER_NOTE_MAX_LENGTH}
+                placeholder='e.g. "Bez luka" or "Pozvoniti na interfon"'
+                className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 disabled:cursor-not-allowed disabled:bg-zinc-50"
+              />
+            </label>
+            <p className="mt-1.5 text-xs text-zinc-400">
+              {note.trim().length}/{ORDER_NOTE_MAX_LENGTH}
+            </p>
+          </section>
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
@@ -198,7 +282,13 @@ export function CheckoutView() {
             disabled={isSubmitting}
             className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-orange-600 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Placing order..." : "Place Order"}
+            {isSubmitting
+              ? paymentMethod === "CARD"
+                ? "Continuing to payment..."
+                : "Placing order..."
+              : paymentMethod === "CARD"
+                ? "Continue to payment"
+                : "Place Order"}
           </button>
         </div>
       </div>

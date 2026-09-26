@@ -15,6 +15,8 @@ type HomePageProps = {
     search?: string;
     type?: string;
     sort?: string;
+    lat?: string;
+    lng?: string;
   }>;
 };
 
@@ -27,6 +29,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     search: query.search,
     restaurantType: query.type,
     sort: query.sort,
+    origin: query.origin,
   });
 
   return (
@@ -45,10 +48,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
         <div className="mb-8">
           <RestaurantFilters
-            key={`${query.search ?? ""}-${query.type ?? ""}-${query.sort}`}
+            key={`${query.search ?? ""}-${query.type ?? ""}-${query.sort}-${query.origin?.latitude ?? ""}-${query.origin?.longitude ?? ""}`}
             search={query.search ?? ""}
             type={query.type ?? ""}
             sort={query.sort}
+            lat={query.origin?.latitude}
+            lng={query.origin?.longitude}
             typeOptions={getRestaurantTypeOptions()}
             isActive={isActive}
           />

@@ -86,3 +86,13 @@ export async function requireCustomerAuth(): Promise<
 > {
   return requireRoleAuth(Role.CUSTOMER, "Customer access required");
 }
+
+/**
+ * Require a valid JWT whose role is RESTAURANT.
+ * Returns 401 when unauthenticated, 403 when authenticated but not RESTAURANT.
+ */
+export async function requireRestaurantAuth(): Promise<
+  RoleAuthSuccess | RoleAuthFailure
+> {
+  return requireRoleAuth(Role.RESTAURANT, "Restaurant access required");
+}

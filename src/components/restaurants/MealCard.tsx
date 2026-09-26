@@ -69,6 +69,7 @@ export function MealCard({
 
           <MealReviewSection
             mealId={meal.id}
+            mealName={meal.name}
             rating={{
               averageRating: meal.averageRating,
               reviewCount: meal.reviewCount,

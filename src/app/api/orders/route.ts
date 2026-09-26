@@ -1,5 +1,6 @@
+import { PaymentMethod } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { getAuthPayload } from "@/lib/auth-request";
+import { getAuthPayload, requireCustomerAuth } from "@/lib/auth-request";
 import {
   createOrder,
   CreateOrderError,
@@ -33,13 +34,10 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await getAuthPayload();
+    const customer = await requireCustomerAuth();
 
-    if (!auth) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
-      );
+    if (!customer.ok) {
+      return customer.response;
     }
 
     let body: unknown;
@@ -65,12 +63,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const { deliveryAddress, paymentMethod, items } = parsed.data;
+    const {
+      restaurantId,
+      deliveryAddress,
+      fulfillmentType,
+      paymentMethod,
+      note,
+      items,
+    } = parsed.data;
+
+    if (paymentMethod === PaymentMethod.CARD) {
+      return NextResponse.json(
+        { error: "Card payments must be completed through Stripe Checkout" },
+        { status: 400 },
+      );
+    }
 
     const order = await createOrder({
-      userId: auth.userId,
+      userId: customer.auth.userId,
+      restaurantId,
       deliveryAddress,
+      fulfillmentType,
       paymentMethod,
+      note,
       items,
     });
 

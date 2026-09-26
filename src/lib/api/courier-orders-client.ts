@@ -4,9 +4,13 @@ export type CourierOrderDto = {
   id: number;
   status: string;
   totalPrice: string | number;
+  fulfillmentType: string;
   paymentMethod: string;
+  paymentStatus: string;
   createdAt: string;
-  estimatedDeliveryTime: string | null;
+  estimatedDeliveryTime: number | null;
+  note: string | null;
+  failureNote: string | null;
   orderAddress: string;
   customer: {
     firstName: string;
@@ -96,6 +100,34 @@ export async function markCourierOrderDelivered(orderId: number) {
       ok: false as const,
       status: response.status,
       error: errorBody.error ?? "Could not mark this order as delivered.",
+    };
+  }
+
+  const body = (await response.json()) as { order: CourierOrderDto };
+
+  return {
+    ok: true as const,
+    order: body.order,
+  };
+}
+
+export async function markCourierOrderFailed(
+  orderId: number,
+  failureNote: string,
+) {
+  const response = await fetch(`/api/courier/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ status: "FAILED", failureNote }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await parseApiError(response);
+    return {
+      ok: false as const,
+      status: response.status,
+      error: errorBody.error ?? "Could not mark this delivery as failed.",
     };
   }
 

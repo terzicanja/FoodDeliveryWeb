@@ -1,11 +1,16 @@
 import {
+  FulfillmentType,
   OrderStatus,
   PaymentMethod,
+  PaymentStatus,
   Prisma,
   Role,
   type Order,
 } from "@prisma/client";
-import { canRoleTransitionOrderStatus } from "@/lib/order-status";
+import {
+  canCustomerCancelOrder,
+  canRoleTransitionOrderStatus,
+} from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import type { CreateOrderInput } from "@/lib/validations/orders";
 
@@ -18,9 +23,13 @@ export const customerOrderListSelect = {
   id: true,
   status: true,
   totalPrice: true,
+  fulfillmentType: true,
   paymentMethod: true,
+  paymentStatus: true,
   createdAt: true,
   estimatedDeliveryTime: true,
+  note: true,
+  failureNote: true,
   restaurant: {
     select: {
       id: true,
@@ -68,9 +77,13 @@ export const adminOrderListSelect = {
   id: true,
   status: true,
   totalPrice: true,
+  fulfillmentType: true,
   paymentMethod: true,
+  paymentStatus: true,
   createdAt: true,
   estimatedDeliveryTime: true,
+  note: true,
+  failureNote: true,
   orderAddress: true,
   user: {
     select: {
@@ -120,9 +133,13 @@ export const courierOrderListSelect = {
   id: true,
   status: true,
   totalPrice: true,
+  fulfillmentType: true,
   paymentMethod: true,
+  paymentStatus: true,
   createdAt: true,
   estimatedDeliveryTime: true,
+  note: true,
+  failureNote: true,
   orderAddress: true,
   user: {
     select: {
@@ -164,9 +181,27 @@ export type CourierOrdersForCourier = {
   myOrders: CourierOrderListItem[];
 };
 
+export type ResolvedOrderItem = {
+  mealId: number;
+  name: string;
+  quantity: number;
+  unitPrice: Prisma.Decimal;
+};
+
+export type ResolvedOrderItems = {
+  restaurantId: number;
+  totalPrice: Prisma.Decimal;
+  items: ResolvedOrderItem[];
+};
+
 export type CreateOrderErrorCode =
   | "MEAL_NOT_FOUND"
-  | "DIFFERENT_RESTAURANTS";
+  | "DIFFERENT_RESTAURANTS"
+  | "INVALID_CUSTOMER";
+
+export type CancelOrderErrorCode =
+  | "ORDER_NOT_FOUND"
+  | "INVALID_TRANSITION";
 
 export type UpdateOrderStatusErrorCode =
   | "ORDER_NOT_FOUND"
@@ -186,6 +221,16 @@ export class CreateOrderError extends Error {
   constructor(code: CreateOrderErrorCode, message: string) {
     super(message);
     this.name = "CreateOrderError";
+    this.code = code;
+  }
+}
+
+export class CancelOrderError extends Error {
+  readonly code: CancelOrderErrorCode;
+
+  constructor(code: CancelOrderErrorCode, message: string) {
+    super(message);
+    this.name = "CancelOrderError";
     this.code = code;
   }
 }
@@ -212,10 +257,22 @@ export class CourierOrderError extends Error {
 
 type CreateOrderParams = {
   userId: number;
+  restaurantId: number;
   deliveryAddress: string;
+  fulfillmentType: CreateOrderInput["fulfillmentType"];
   paymentMethod: CreateOrderInput["paymentMethod"];
+  paymentStatus?: PaymentStatus;
+  stripeCheckoutSessionId?: string;
+  note: CreateOrderInput["note"];
   items: CreateOrderInput["items"];
 };
+
+const createdOrderSelect = {
+  id: true,
+  status: true,
+  totalPrice: true,
+  createdAt: true,
+} satisfies Prisma.OrderSelect;
 
 type UpdateOrderStatusParams = {
   orderId: number;
@@ -258,9 +315,13 @@ function mapCustomerOrder(order: CustomerOrderWithReviews): CustomerOrderListIte
     id: order.id,
     status: order.status,
     totalPrice: order.totalPrice,
+    fulfillmentType: order.fulfillmentType,
     paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
     createdAt: order.createdAt,
     estimatedDeliveryTime: order.estimatedDeliveryTime,
+    note: order.note,
+    failureNote: order.failureNote,
     restaurant: order.restaurant,
     items: order.items.map((item) => ({
       quantity: item.quantity,
@@ -295,13 +356,13 @@ function mapCourierOrder(order: CourierOrderRecord): CourierOrderListItem {
 
 function estimatedDeliveryTimeForStatus(
   nextStatus: OrderStatus,
-): Date | undefined {
+): number | undefined {
   if (nextStatus === OrderStatus.ACCEPTED) {
-    return new Date(Date.now() + ETA_MINUTES_ON_ACCEPTED * 60 * 1000);
+    return ETA_MINUTES_ON_ACCEPTED;
   }
 
   if (nextStatus === OrderStatus.READY) {
-    return new Date(Date.now() + ETA_MINUTES_ON_READY * 60 * 1000);
+    return ETA_MINUTES_ON_READY;
   }
 
   return undefined;
@@ -428,7 +489,11 @@ export async function getOrdersForCourier(
   const orders = await prisma.order.findMany({
     where: {
       OR: [
-        { status: OrderStatus.READY, courierId: null },
+        {
+          status: OrderStatus.READY,
+          courierId: null,
+          fulfillmentType: FulfillmentType.DELIVERY,
+        },
         { status: OrderStatus.OUT_FOR_DELIVERY, courierId },
       ],
     },
@@ -456,7 +521,12 @@ export async function acceptCourierOrder(params: {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: params.orderId },
-      select: { id: true, status: true, courierId: true },
+      select: {
+        id: true,
+        status: true,
+        courierId: true,
+        fulfillmentType: true,
+      },
     });
 
     if (!order) {
@@ -464,6 +534,7 @@ export async function acceptCourierOrder(params: {
     }
 
     if (
+      order.fulfillmentType !== FulfillmentType.DELIVERY ||
       !canRoleTransitionOrderStatus(
         Role.COURIER,
         order.status,
@@ -506,13 +577,25 @@ export async function acceptCourierOrder(params: {
 }
 
 /**
- * Courier may only mark their own OUT_FOR_DELIVERY order as DELIVERED.
+ * Courier may mark their own OUT_FOR_DELIVERY order as DELIVERED or FAILED.
+ * FAILED requires a non-empty failure note (validated before this call).
  */
 export async function deliverCourierOrder(params: {
   orderId: number;
   courierId: number;
   nextStatus: OrderStatus;
+  failureNote?: string;
 }): Promise<CourierOrderListItem> {
+  if (
+    params.nextStatus !== OrderStatus.DELIVERED &&
+    params.nextStatus !== OrderStatus.FAILED
+  ) {
+    throw new CourierOrderError(
+      "INVALID_TRANSITION",
+      `Courier cannot set status to ${params.nextStatus}`,
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: params.orderId },
@@ -523,13 +606,16 @@ export async function deliverCourierOrder(params: {
       throw new CourierOrderError("ORDER_NOT_FOUND", "Order not found");
     }
 
+    if (order.courierId !== params.courierId) {
+      throw new CourierOrderError("ORDER_NOT_FOUND", "Order not found");
+    }
+
     if (
       !canRoleTransitionOrderStatus(
         Role.COURIER,
         order.status,
         params.nextStatus,
-      ) ||
-      params.nextStatus !== OrderStatus.DELIVERED
+      )
     ) {
       throw new CourierOrderError(
         "INVALID_TRANSITION",
@@ -537,8 +623,15 @@ export async function deliverCourierOrder(params: {
       );
     }
 
-    if (order.courierId !== params.courierId) {
-      throw new CourierOrderError("ORDER_NOT_FOUND", "Order not found");
+    if (params.nextStatus === OrderStatus.FAILED) {
+      const note = params.failureNote?.trim() ?? "";
+
+      if (!note) {
+        throw new CourierOrderError(
+          "INVALID_TRANSITION",
+          "A failure note is required",
+        );
+      }
     }
 
     const updatedCount = await tx.order.updateMany({
@@ -547,9 +640,15 @@ export async function deliverCourierOrder(params: {
         status: OrderStatus.OUT_FOR_DELIVERY,
         courierId: params.courierId,
       },
-      data: {
-        status: OrderStatus.DELIVERED,
-      },
+      data:
+        params.nextStatus === OrderStatus.FAILED
+          ? {
+              status: OrderStatus.FAILED,
+              failureNote: params.failureNote!.trim(),
+            }
+          : {
+              status: OrderStatus.DELIVERED,
+            },
     });
 
     if (updatedCount.count !== 1) {
@@ -569,12 +668,13 @@ export async function deliverCourierOrder(params: {
 }
 
 /**
- * Create an order from cart line items.
- * Prices and restaurant are derived from the database, never from the client.
+ * Resolve cart line items against the database.
+ * Prices, names, and restaurant membership come from PostgreSQL, never the client.
  */
-export async function createOrder(
-  params: CreateOrderParams,
-): Promise<CreatedOrder> {
+export async function resolveOrderItems(params: {
+  restaurantId: number;
+  items: CreateOrderInput["items"];
+}): Promise<ResolvedOrderItems> {
   const quantityByMealId = mergeItemQuantities(params.items);
   const mealIds = [...quantityByMealId.keys()];
 
@@ -582,6 +682,7 @@ export async function createOrder(
     where: { id: { in: mealIds } },
     select: {
       id: true,
+      name: true,
       price: true,
       restaurantId: true,
     },
@@ -596,18 +697,20 @@ export async function createOrder(
 
   const restaurantIds = new Set(meals.map((meal) => meal.restaurantId));
 
-  if (restaurantIds.size !== 1) {
+  if (
+    restaurantIds.size !== 1 ||
+    !restaurantIds.has(params.restaurantId)
+  ) {
     throw new CreateOrderError(
       "DIFFERENT_RESTAURANTS",
-      "All meals must belong to the same restaurant",
+      "All meals must belong to the selected restaurant",
     );
   }
 
-  const restaurantId = meals[0].restaurantId;
   const mealById = new Map(meals.map((meal) => [meal.id, meal]));
 
   let totalPrice = new Prisma.Decimal(0);
-  const orderItems = mealIds.map((mealId) => {
+  const items = mealIds.map((mealId) => {
     const meal = mealById.get(mealId);
 
     if (!meal) {
@@ -622,34 +725,244 @@ export async function createOrder(
 
     return {
       mealId: meal.id,
+      name: meal.name,
       quantity,
-      priceAtPurchase: meal.price,
+      unitPrice: meal.price,
     };
   });
 
-  const paymentMethodMap = {
-    CASH: PaymentMethod.CASH,
-  } as const;
+  return {
+    restaurantId: params.restaurantId,
+    totalPrice,
+    items,
+  };
+}
+
+/**
+ * Create an order from cart line items.
+ * Prices and restaurant are derived from the database, never from the client.
+ */
+export async function createOrder(
+  params: CreateOrderParams,
+): Promise<CreatedOrder> {
+  const resolved = await resolveOrderItems({
+    restaurantId: params.restaurantId,
+    items: params.items,
+  });
 
   return prisma.$transaction(async (tx) => {
     return tx.order.create({
       data: {
         status: OrderStatus.PENDING,
-        paymentMethod: paymentMethodMap[params.paymentMethod],
-        totalPrice,
+        fulfillmentType: params.fulfillmentType,
+        paymentMethod: params.paymentMethod,
+        paymentStatus: params.paymentStatus ?? PaymentStatus.PENDING,
+        stripeCheckoutSessionId: params.stripeCheckoutSessionId,
+        totalPrice: resolved.totalPrice,
         orderAddress: params.deliveryAddress,
+        note: params.note,
         userId: params.userId,
-        restaurantId,
+        restaurantId: resolved.restaurantId,
         items: {
-          create: orderItems,
+          create: resolved.items.map((item) => ({
+            mealId: item.mealId,
+            quantity: item.quantity,
+            priceAtPurchase: item.unitPrice,
+          })),
         },
       },
-      select: {
-        id: true,
-        status: true,
-        totalPrice: true,
-        createdAt: true,
+      select: createdOrderSelect,
+    });
+  });
+}
+
+/**
+ * Create a PAID CARD order from a verified Stripe Checkout Session.
+ * Idempotent on stripeCheckoutSessionId, including concurrent webhook retries.
+ */
+export async function createPaidCardOrderForCheckoutSession(params: {
+  checkoutSessionId: string;
+  userId: number;
+  restaurantId: number;
+  deliveryAddress: string;
+  fulfillmentType: CreateOrderInput["fulfillmentType"];
+  note: CreateOrderInput["note"];
+  items: CreateOrderInput["items"];
+}): Promise<CreatedOrder> {
+  const existing = await prisma.order.findUnique({
+    where: { stripeCheckoutSessionId: params.checkoutSessionId },
+    select: createdOrderSelect,
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: params.userId },
+    select: { id: true, role: true },
+  });
+
+  if (!user || user.role !== Role.CUSTOMER) {
+    throw new CreateOrderError(
+      "INVALID_CUSTOMER",
+      "Checkout session customer is invalid",
+    );
+  }
+
+  try {
+    return await createOrder({
+      userId: params.userId,
+      restaurantId: params.restaurantId,
+      deliveryAddress: params.deliveryAddress,
+      fulfillmentType: params.fulfillmentType,
+      paymentMethod: PaymentMethod.CARD,
+      paymentStatus: PaymentStatus.PAID,
+      stripeCheckoutSessionId: params.checkoutSessionId,
+      note: params.note,
+      items: params.items,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const concurrent = await prisma.order.findUnique({
+        where: { stripeCheckoutSessionId: params.checkoutSessionId },
+        select: createdOrderSelect,
+      });
+
+      if (concurrent) {
+        return concurrent;
+      }
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Look up a verified paid CARD order for a Checkout Session and customer.
+ * Missing vs unavailable lets the success page retry only when the webhook
+ * may still be creating the row.
+ */
+export async function findPaidCardOrderForCheckoutSession(params: {
+  checkoutSessionId: string;
+  userId: number;
+}): Promise<
+  | { status: "found"; order: CreatedOrder }
+  | { status: "missing" }
+  | { status: "unavailable" }
+> {
+  const order = await prisma.order.findUnique({
+    where: { stripeCheckoutSessionId: params.checkoutSessionId },
+    select: {
+      ...createdOrderSelect,
+      userId: true,
+      paymentMethod: true,
+      paymentStatus: true,
+    },
+  });
+
+  if (!order) {
+    return { status: "missing" };
+  }
+
+  if (
+    order.userId !== params.userId ||
+    order.paymentMethod !== PaymentMethod.CARD ||
+    order.paymentStatus !== PaymentStatus.PAID
+  ) {
+    return { status: "unavailable" };
+  }
+
+  return {
+    status: "found",
+    order: {
+      id: order.id,
+      status: order.status,
+      totalPrice: order.totalPrice,
+      createdAt: order.createdAt,
+    },
+  };
+}
+
+/**
+ * Customer cancels their own PENDING or ACCEPTED order.
+ * Uses a conditional update so a concurrent PREPARING transition wins safely.
+ */
+export async function cancelOrderForCustomer(params: {
+  orderId: number;
+  userId: number;
+}): Promise<CustomerOrderListItem> {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findFirst({
+      where: {
+        id: params.orderId,
+        userId: params.userId,
+      },
+      select: { id: true, status: true },
+    });
+
+    if (!order) {
+      throw new CancelOrderError("ORDER_NOT_FOUND", "Order not found");
+    }
+
+    if (!canCustomerCancelOrder(order.status)) {
+      throw new CancelOrderError(
+        "INVALID_TRANSITION",
+        `Cannot cancel an order with status ${order.status}`,
+      );
+    }
+
+    const updatedCount = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        userId: params.userId,
+        status: { in: [OrderStatus.PENDING, OrderStatus.ACCEPTED] },
+      },
+      data: {
+        status: OrderStatus.CANCELLED,
       },
     });
+
+    if (updatedCount.count !== 1) {
+      throw new CancelOrderError(
+        "INVALID_TRANSITION",
+        "Order can no longer be cancelled",
+      );
+    }
+
+    const updated = await tx.order.findUniqueOrThrow({
+      where: { id: order.id },
+      select: {
+        ...customerOrderListSelect,
+        items: {
+          select: {
+            quantity: true,
+            priceAtPurchase: true,
+            meal: {
+              select: {
+                id: true,
+                name: true,
+                images: true,
+                reviews: {
+                  where: { userId: params.userId },
+                  select: {
+                    id: true,
+                    rating: true,
+                    comment: true,
+                    createdAt: true,
+                  },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return mapCustomerOrder(updated);
   });
 }

@@ -1,4 +1,5 @@
-import { OrderStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { REVIEWABLE_ORDER_STATUSES } from "@/lib/order-status";
 import { prisma } from "@/lib/prisma";
 import type { CreateReviewInput } from "@/lib/validations/reviews";
 
@@ -107,13 +108,13 @@ async function mealExists(mealId: number): Promise<boolean> {
   return meal !== null;
 }
 
-async function findDeliveredPurchase(userId: number, mealId: number) {
+async function findCompletedPurchase(userId: number, mealId: number) {
   return prisma.orderItem.findFirst({
     where: {
       mealId,
       order: {
         userId,
-        status: OrderStatus.DELIVERED,
+        status: { in: [...REVIEWABLE_ORDER_STATUSES] },
       },
     },
     select: { id: true },
@@ -303,13 +304,13 @@ export async function getReviewEligibilityForUser(
     return eligibility;
   }
 
-  const [deliveredItems, ownReviews] = await Promise.all([
+  const [completedItems, ownReviews] = await Promise.all([
     prisma.orderItem.findMany({
       where: {
         mealId: { in: mealIds },
         order: {
           userId,
-          status: OrderStatus.DELIVERED,
+          status: { in: [...REVIEWABLE_ORDER_STATUSES] },
         },
       },
       select: { mealId: true },
@@ -330,7 +331,7 @@ export async function getReviewEligibilityForUser(
     }),
   ]);
 
-  const deliveredMealIds = new Set(deliveredItems.map((item) => item.mealId));
+  const completedMealIds = new Set(completedItems.map((item) => item.mealId));
 
   for (const review of ownReviews) {
     const current = eligibility.get(review.mealId) ?? {
@@ -346,7 +347,7 @@ export async function getReviewEligibilityForUser(
     eligibility.set(review.mealId, current);
   }
 
-  for (const mealId of deliveredMealIds) {
+  for (const mealId of completedMealIds) {
     const current = eligibility.get(mealId) ?? {
       canReview: false,
       ownReview: null,
@@ -368,15 +369,15 @@ export async function createReview(params: {
     throw new CreateReviewError("MEAL_NOT_FOUND", "Meal not found");
   }
 
-  const deliveredPurchase = await findDeliveredPurchase(userId, input.mealId);
+  const completedPurchase = await findCompletedPurchase(userId, input.mealId);
 
-  if (!deliveredPurchase) {
+  if (!completedPurchase) {
     const anyPurchase = await userHasAnyPurchase(userId, input.mealId);
 
     throw new CreateReviewError(
       "NOT_ELIGIBLE",
       anyPurchase
-        ? "You can review this meal after the order has been delivered"
+        ? "You can review this meal after the order has been completed"
         : "You can only review meals you have ordered",
     );
   }

@@ -11,7 +11,7 @@ const RestaurantLeafletMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-72 items-center justify-center bg-zinc-50 text-sm text-zinc-500 sm:h-96">
+      <div className="flex h-48 items-center justify-center bg-zinc-50 text-sm text-zinc-500 sm:h-64">
         Loading map...
       </div>
     ),
@@ -42,7 +42,7 @@ export function RestaurantMap({
 }: RestaurantMapProps) {
   if (!hasValidCoordinates(latitude, longitude)) {
     return (
-      <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center text-sm text-zinc-500 sm:h-96">
+      <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center text-sm text-zinc-500 sm:h-64">
         Location unavailable
       </div>
     );
@@ -50,7 +50,7 @@ export function RestaurantMap({
 
   return (
     <MapErrorBoundary>
-      <div className="relative z-0 h-72 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:h-96">
+      <div className="relative z-0 h-48 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white sm:h-64">
         <RestaurantLeafletMap
           name={name}
           latitude={latitude}
@@ -74,7 +74,7 @@ class MapErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center text-sm text-zinc-500 sm:h-96">
+        <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center text-sm text-zinc-500 sm:h-64">
           Location unavailable
         </div>
       );

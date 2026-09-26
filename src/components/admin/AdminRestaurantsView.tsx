@@ -8,9 +8,7 @@ import { AdminAccessDenied } from "@/components/admin/AdminAccessDenied";
 import { FormField, TextInput } from "@/components/auth/FormField";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  createAdminMeal,
   createAdminRestaurant,
-  deleteAdminMeal,
   deleteAdminRestaurant,
   fetchAdminRestaurantMeals,
   fetchAdminRestaurants,
@@ -19,9 +17,7 @@ import {
 } from "@/lib/api/admin-client";
 import { formatMealPrice } from "@/lib/format";
 import {
-  mealFormSchema,
   restaurantFormSchema,
-  type MealFormInput,
   type RestaurantFormInput,
 } from "@/lib/validations/admin";
 import {
@@ -29,7 +25,12 @@ import {
   RESTAURANT_TYPE_OPTIONS,
 } from "@/lib/validations/restaurants";
 
-type ViewStatus = "loading" | "ready" | "unauthenticated" | "forbidden" | "error";
+type ViewStatus =
+  | "loading"
+  | "ready"
+  | "unauthenticated"
+  | "forbidden"
+  | "error";
 
 function restaurantBlockReason(restaurant: AdminRestaurantDto): string | null {
   const blockers: string[] = [];
@@ -46,25 +47,7 @@ function restaurantBlockReason(restaurant: AdminRestaurantDto): string | null {
     return null;
   }
 
-  return `Cannot delete while related ${blockers.join(", ")} exist.`;
-}
-
-function mealBlockReason(meal: AdminMealDto): string | null {
-  const blockers: string[] = [];
-
-  if (meal.orderItemCount > 0) {
-    blockers.push("order items");
-  }
-
-  if (meal.reviewCount > 0) {
-    blockers.push("reviews");
-  }
-
-  if (blockers.length === 0) {
-    return null;
-  }
-
-  return `Cannot delete while related ${blockers.join(", ")} exist.`;
+  // return `Cannot delete while related ${blockers.join(", ")} exist.`;
 }
 
 export function AdminRestaurantsView() {
@@ -82,7 +65,6 @@ export function AdminRestaurantsView() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [pendingRestaurant, setPendingRestaurant] =
     useState<AdminRestaurantDto | null>(null);
-  const [pendingMeal, setPendingMeal] = useState<AdminMealDto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const restaurantForm = useForm<RestaurantFormInput>({
@@ -244,45 +226,6 @@ export function AdminRestaurantsView() {
     }
   };
 
-  const handleDeleteMeal = async () => {
-    if (!pendingMeal || isDeleting) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setActionError(null);
-
-    try {
-      const result = await deleteAdminMeal(pendingMeal.id);
-
-      if (!result.ok) {
-        setActionError(result.error);
-        setPendingMeal(null);
-        return;
-      }
-
-      setMealsByRestaurant((current) => ({
-        ...current,
-        [pendingMeal.restaurantId]: (current[pendingMeal.restaurantId] ?? []).filter(
-          (meal) => meal.id !== pendingMeal.id,
-        ),
-      }));
-      setRestaurants((current) =>
-        current.map((restaurant) =>
-          restaurant.id === pendingMeal.restaurantId
-            ? { ...restaurant, mealCount: Math.max(0, restaurant.mealCount - 1) }
-            : restaurant,
-        ),
-      );
-      setSuccess(`${pendingMeal.name} was deleted.`);
-      setPendingMeal(null);
-    } catch {
-      setActionError("Could not delete the meal.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   if (status === "loading" || status === "unauthenticated") {
     return (
       <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-12 text-center text-sm text-zinc-500">
@@ -315,8 +258,7 @@ export function AdminRestaurantsView() {
             Restaurants
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            Add restaurants and manage their meals. Historical orders and reviews
-            are preserved.
+            Add restaurants. Menu changes are managed by restaurant users.
           </p>
         </div>
         <button
@@ -351,7 +293,10 @@ export function AdminRestaurantsView() {
           <h3 className="text-base font-semibold text-zinc-900">
             New restaurant
           </h3>
-          <FormField label="Name" error={restaurantForm.formState.errors.name?.message}>
+          <FormField
+            label="Name"
+            error={restaurantForm.formState.errors.name?.message}
+          >
             <TextInput
               hasError={Boolean(restaurantForm.formState.errors.name)}
               {...restaurantForm.register("name")}
@@ -424,7 +369,7 @@ export function AdminRestaurantsView() {
             No restaurants yet
           </h3>
           <p className="mt-2 text-sm text-zinc-500">
-            Add a restaurant to start managing meals.
+            Add a restaurant to start building the catalog.
           </p>
         </div>
       ) : (
@@ -444,7 +389,9 @@ export function AdminRestaurantsView() {
                     <p className="text-base font-semibold text-zinc-900">
                       {restaurant.name}
                     </p>
-                    <p className="mt-1 text-sm text-zinc-500">{restaurant.address}</p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {restaurant.address}
+                    </p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {restaurant.restaurantTypes.map((type) => (
                         <span
@@ -461,7 +408,9 @@ export function AdminRestaurantsView() {
                       </p>
                     ) : null}
                     {blockReason ? (
-                      <p className="mt-2 text-sm text-amber-700">{blockReason}</p>
+                      <p className="mt-2 text-sm text-amber-700">
+                        {blockReason}
+                      </p>
                     ) : null}
                   </div>
 
@@ -473,7 +422,7 @@ export function AdminRestaurantsView() {
                       }}
                       className="inline-flex h-10 items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
                     >
-                      {isExpanded ? "Hide meals" : "Manage meals"}
+                      {isExpanded ? "Hide meals" : "View meals"}
                     </button>
                     <button
                       type="button"
@@ -495,34 +444,7 @@ export function AdminRestaurantsView() {
                     {loadingMealsId === restaurant.id && !meals ? (
                       <p className="text-sm text-zinc-500">Loading meals...</p>
                     ) : (
-                      <RestaurantMealsPanel
-                        restaurantId={restaurant.id}
-                        meals={meals ?? []}
-                        isDeleting={isDeleting}
-                        onCreated={(meal) => {
-                          setMealsByRestaurant((current) => ({
-                            ...current,
-                            [restaurant.id]: [...(current[restaurant.id] ?? []), meal].sort(
-                              (left, right) => left.name.localeCompare(right.name),
-                            ),
-                          }));
-                          setRestaurants((current) =>
-                            current.map((item) =>
-                              item.id === restaurant.id
-                                ? { ...item, mealCount: item.mealCount + 1 }
-                                : item,
-                            ),
-                          );
-                          setSuccess(`${meal.name} was added.`);
-                          setActionError(null);
-                        }}
-                        onCreateError={setActionError}
-                        onDelete={(meal) => {
-                          setActionError(null);
-                          setSuccess(null);
-                          setPendingMeal(meal);
-                        }}
-                      />
+                      <RestaurantMealsPanel meals={meals ?? []} />
                     )}
                   </div>
                 ) : null}
@@ -550,243 +472,50 @@ export function AdminRestaurantsView() {
           }
         }}
       />
-
-      <ConfirmDialog
-        open={pendingMeal !== null}
-        title="Delete meal?"
-        description={
-          pendingMeal
-            ? `Delete ${pendingMeal.name}? This cannot be undone.`
-            : ""
-        }
-        confirmLabel={isDeleting ? "Deleting..." : "Delete"}
-        onConfirm={() => {
-          void handleDeleteMeal();
-        }}
-        onCancel={() => {
-          if (!isDeleting) {
-            setPendingMeal(null);
-          }
-        }}
-      />
     </div>
   );
 }
 
-function RestaurantMealsPanel({
-  restaurantId,
-  meals,
-  isDeleting,
-  onCreated,
-  onCreateError,
-  onDelete,
-}: {
-  restaurantId: number;
-  meals: AdminMealDto[];
-  isDeleting: boolean;
-  onCreated: (meal: AdminMealDto) => void;
-  onCreateError: (message: string) => void;
-  onDelete: (meal: AdminMealDto) => void;
-}) {
-  const [showForm, setShowForm] = useState(false);
-  const mealForm = useForm<MealFormInput>({
-    resolver: zodResolver(mealFormSchema),
-    defaultValues: {
-      name: "",
-      description: "",
-      price: 0,
-      images: [""],
-    },
-  });
-  const imageValues = mealForm.watch("images");
-
-  const onCreateMeal = mealForm.handleSubmit(async (values) => {
-    const result = await createAdminMeal(restaurantId, {
-      name: values.name,
-      description: values.description,
-      price: values.price,
-      images: values.images,
-    });
-
-    if (!result.ok) {
-      if (result.details) {
-        for (const [field, messages] of Object.entries(result.details)) {
-          if (
-            messages?.[0] &&
-            (field === "name" ||
-              field === "description" ||
-              field === "price" ||
-              field === "images")
-          ) {
-            mealForm.setError(field, { message: messages[0] });
-          }
-        }
-      }
-
-      onCreateError(result.error);
-      return;
-    }
-
-    mealForm.reset({
-      name: "",
-      description: "",
-      price: 0,
-      images: [""],
-    });
-    setShowForm(false);
-    onCreated(result.meal);
-  });
-
+function RestaurantMealsPanel({ meals }: { meals: AdminMealDto[] }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-          Meals
-        </h3>
-        <button
-          type="button"
-          onClick={() => setShowForm((current) => !current)}
-          className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
-        >
-          {showForm ? "Cancel" : "Add Meal"}
-        </button>
-      </div>
-
-      {showForm ? (
-        <form onSubmit={onCreateMeal} className="space-y-3 rounded-xl bg-zinc-50 p-4">
-          <FormField label="Name" error={mealForm.formState.errors.name?.message}>
-            <TextInput
-              hasError={Boolean(mealForm.formState.errors.name)}
-              {...mealForm.register("name")}
-            />
-          </FormField>
-          <FormField
-            label="Description"
-            error={mealForm.formState.errors.description?.message}
-          >
-            <textarea
-              rows={2}
-              className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 ${
-                mealForm.formState.errors.description
-                  ? "border-red-400"
-                  : "border-zinc-300"
-              }`}
-              {...mealForm.register("description")}
-            />
-          </FormField>
-          <FormField label="Price" error={mealForm.formState.errors.price?.message}>
-            <TextInput
-              type="number"
-              step="0.01"
-              min="0.01"
-              hasError={Boolean(mealForm.formState.errors.price)}
-              {...mealForm.register("price", { valueAsNumber: true })}
-            />
-          </FormField>
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-zinc-700">Image URLs</p>
-            {imageValues.map((_value, index) => (
-              <div key={index} className="flex gap-2">
-                <TextInput
-                  placeholder="https://..."
-                  hasError={Boolean(mealForm.formState.errors.images?.[index])}
-                  {...mealForm.register(`images.${index}`)}
-                />
-                {imageValues.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      mealForm.setValue(
-                        "images",
-                        imageValues.filter((_, imageIndex) => imageIndex !== index),
-                      );
-                    }}
-                    className="inline-flex h-10 shrink-0 items-center rounded-lg border border-zinc-300 px-3 text-sm text-zinc-600 hover:bg-white"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-            ))}
-            {mealForm.formState.errors.images?.message ||
-            mealForm.formState.errors.images?.root?.message ? (
-              <p className="text-sm text-red-600">
-                {mealForm.formState.errors.images.message ??
-                  mealForm.formState.errors.images.root?.message}
-              </p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                mealForm.setValue("images", [...imageValues, ""]);
-              }}
-              className="text-sm font-medium text-orange-700 hover:text-orange-800"
-            >
-              Add image URL
-            </button>
-          </div>
-          <button
-            type="submit"
-            disabled={mealForm.formState.isSubmitting}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:opacity-60"
-          >
-            {mealForm.formState.isSubmitting ? "Creating..." : "Create meal"}
-          </button>
-        </form>
-      ) : null}
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
+        Meals
+      </h3>
 
       {meals.length === 0 ? (
         <p className="text-sm text-zinc-500">No meals yet.</p>
       ) : (
         <ul className="space-y-3">
-          {meals.map((meal) => {
-            const blockReason = mealBlockReason(meal);
-
-            return (
-              <li
-                key={meal.id}
-                className="rounded-xl border border-zinc-200 bg-white p-4"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="font-medium text-zinc-900">
-                      {meal.name}{" "}
-                      <span className="font-normal text-zinc-500">
-                        · {formatMealPrice(meal.price)}
-                      </span>
-                    </p>
-                    {meal.description ? (
-                      <p className="mt-1 text-sm text-zinc-600">{meal.description}</p>
-                    ) : null}
-                    {meal.images.length > 0 ? (
-                      <ul className="mt-2 space-y-1">
-                        {meal.images.map((url) => (
-                          <li
-                            key={url}
-                            className="truncate text-xs text-zinc-400"
-                            title={url}
-                          >
-                            {url}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {blockReason ? (
-                      <p className="mt-2 text-sm text-amber-700">{blockReason}</p>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={Boolean(blockReason) || isDeleting}
-                    onClick={() => onDelete(meal)}
-                    className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-red-200 px-3 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            );
-          })}
+          {meals.map((meal) => (
+            <li
+              key={meal.id}
+              className="rounded-xl border border-zinc-200 bg-white p-4"
+            >
+              <p className="font-medium text-zinc-900">
+                {meal.name}{" "}
+                <span className="font-normal text-zinc-500">
+                  · {formatMealPrice(meal.price)}
+                </span>
+              </p>
+              {meal.description ? (
+                <p className="mt-1 text-sm text-zinc-600">{meal.description}</p>
+              ) : null}
+              {meal.images.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {meal.images.map((url) => (
+                    <li
+                      key={url}
+                      className="truncate text-xs text-zinc-400"
+                      title={url}
+                    >
+                      {url}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
+          ))}
         </ul>
       )}
     </div>

@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 980" width="1280" height="980">
+  <style>
+    .box { fill: #fff; stroke: #111; stroke-width: 2; }
+    .title { font: 700 22px Helvetica, Arial, sans-serif; fill: #111; text-anchor: middle; }
+    .actor-name { font: 600 14px Helvetica, Arial, sans-serif; fill: #111; text-anchor: middle; }
+    .uc { fill: #fff; stroke: #111; stroke-width: 1.6; }
+    .uc-text { font: 13px Helvetica, Arial, sans-serif; fill: #111; text-anchor: middle; }
+    .line { stroke: #111; stroke-width: 1.4; fill: none; }
+  </style>
+
+  <rect class="box" x="250" y="24" width="780" height="932" rx="4"/>
+  <text class="title" x="640" y="56">FoodDelivery</text>
+
+  <g transform="translate(90,110)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Guest</text>
+  </g>
+  <g transform="translate(90,270)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Customer</text>
+  </g>
+  <g transform="translate(90,450)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Restaurant</text>
+  </g>
+  <g transform="translate(90,610)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Courier</text>
+  </g>
+  <g transform="translate(90,800)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Admin</text>
+  </g>
+  <g transform="translate(1190,525)">
+    <circle cx="0" cy="0" r="12" fill="none" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="12" x2="0" y2="42" stroke="#111" stroke-width="1.6"/>
+    <line x1="-18" y1="22" x2="18" y2="22" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="-14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <line x1="0" y1="42" x2="14" y2="68" stroke="#111" stroke-width="1.6"/>
+    <text class="actor-name" x="0" y="88">Stripe</text>
+  </g>
+
+  <!-- Guest -->
+  <ellipse class="uc" cx="480" cy="100" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="104">Browse restaurants</text>
+  <ellipse class="uc" cx="480" cy="150" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="154">View restaurant menu</text>
+  <ellipse class="uc" cx="800" cy="100" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="104">Manage shopping cart</text>
+  <ellipse class="uc" cx="800" cy="150" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="154">Register</text>
+
+  <!-- Customer -->
+  <ellipse class="uc" cx="480" cy="230" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="234">Log in / Log out</text>
+  <ellipse class="uc" cx="480" cy="280" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="284">Place order</text>
+  <ellipse class="uc" cx="480" cy="330" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="334">Pay with Stripe</text>
+  <ellipse class="uc" cx="800" cy="230" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="234">View own orders</text>
+  <ellipse class="uc" cx="800" cy="280" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="284">Cancel order</text>
+  <ellipse class="uc" cx="800" cy="330" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="334">Review meal</text>
+
+  <!-- Restaurant -->
+  <ellipse class="uc" cx="480" cy="420" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="424">Manage menu</text>
+  <ellipse class="uc" cx="480" cy="470" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="474">View restaurant orders</text>
+  <ellipse class="uc" cx="800" cy="420" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="424">Process order</text>
+  <ellipse class="uc" cx="800" cy="470" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="474">Complete pickup</text>
+
+  <!-- Stripe -->
+  <ellipse class="uc" cx="800" cy="545" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="549">Process payment</text>
+
+  <!-- Courier -->
+  <ellipse class="uc" cx="480" cy="620" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="624">View available deliveries</text>
+  <ellipse class="uc" cx="480" cy="670" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="674">Accept delivery</text>
+  <ellipse class="uc" cx="800" cy="620" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="624">Confirm delivery</text>
+  <ellipse class="uc" cx="800" cy="670" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="674">Report failed delivery</text>
+
+  <!-- Admin -->
+  <ellipse class="uc" cx="480" cy="770" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="774">Create restaurant</text>
+  <ellipse class="uc" cx="480" cy="820" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="824">View restaurants and meals</text>
+  <ellipse class="uc" cx="480" cy="870" rx="150" ry="22"/>
+  <text class="uc-text" x="480" y="874">Delete restaurant</text>
+  <ellipse class="uc" cx="800" cy="795" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="799">View users</text>
+  <ellipse class="uc" cx="800" cy="845" rx="150" ry="22"/>
+  <text class="uc-text" x="800" y="849">Delete user</text>
+
+  <!-- Guest lines -->
+  <line class="line" x1="108" y1="132" x2="330" y2="100"/>
+  <line class="line" x1="108" y1="132" x2="330" y2="150"/>
+  <line class="line" x1="108" y1="132" x2="650" y2="100"/>
+  <line class="line" x1="108" y1="132" x2="650" y2="150"/>
+
+  <!-- Customer lines -->
+  <line class="line" x1="108" y1="292" x2="330" y2="230"/>
+  <line class="line" x1="108" y1="292" x2="330" y2="280"/>
+  <line class="line" x1="108" y1="292" x2="330" y2="330"/>
+  <line class="line" x1="108" y1="292" x2="650" y2="230"/>
+  <line class="line" x1="108" y1="292" x2="650" y2="280"/>
+  <line class="line" x1="108" y1="292" x2="650" y2="330"/>
+
+  <!-- Restaurant lines -->
+  <line class="line" x1="108" y1="472" x2="330" y2="420"/>
+  <line class="line" x1="108" y1="472" x2="330" y2="470"/>
+  <line class="line" x1="108" y1="472" x2="650" y2="420"/>
+  <line class="line" x1="108" y1="472" x2="650" y2="470"/>
+
+  <!-- Courier lines -->
+  <line class="line" x1="108" y1="632" x2="330" y2="620"/>
+  <line class="line" x1="108" y1="632" x2="330" y2="670"/>
+  <line class="line" x1="108" y1="632" x2="650" y2="620"/>
+  <line class="line" x1="108" y1="632" x2="650" y2="670"/>
+
+  <!-- Admin lines -->
+  <line class="line" x1="108" y1="822" x2="330" y2="770"/>
+  <line class="line" x1="108" y1="822" x2="330" y2="820"/>
+  <line class="line" x1="108" y1="822" x2="330" y2="870"/>
+  <line class="line" x1="108" y1="822" x2="650" y2="795"/>
+  <line class="line" x1="108" y1="822" x2="650" y2="845"/>
+
+  <!-- Stripe line -->
+  <line class="line" x1="1172" y1="547" x2="950" y2="545"/>
+</svg>

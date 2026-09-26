@@ -1,35 +1,21 @@
 "use client";
 
-import { OrderStatus } from "@prisma/client";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import type { AdminOrderDto } from "@/lib/api/admin-orders-client";
-import { formatOrderDate, formatPaymentMethod } from "@/lib/format";
-import { getAdminAllowedNextStatuses } from "@/lib/order-status";
+import {
+  formatEstimatedDeliveryTime,
+  formatFulfillmentType,
+  formatOrderDate,
+  formatPaymentMethod,
+  formatPaymentStatus,
+} from "@/lib/format";
 import { formatMealPrice } from "@/lib/restaurants";
-
-const ADMIN_STATUS_ACTION_LABELS: Partial<Record<OrderStatus, string>> = {
-  ACCEPTED: "Accept",
-  REJECTED: "Reject",
-  PREPARING: "Start Preparing",
-  READY: "Mark Ready",
-};
 
 type AdminOrderCardProps = {
   order: AdminOrderDto;
-  isUpdating: boolean;
-  pendingStatus: string | null;
-  error: string | null;
-  onStatusChange: (nextStatus: OrderStatus) => void;
 };
 
-export function AdminOrderCard({
-  order,
-  isUpdating,
-  pendingStatus,
-  error,
-  onStatusChange,
-}: AdminOrderCardProps) {
-  const nextStatuses = getAdminAllowedNextStatuses(order.status as OrderStatus);
+export function AdminOrderCard({ order }: AdminOrderCardProps) {
   const customerName = `${order.customer.firstName} ${order.customer.lastName}`;
   const courierName = order.courier
     ? `${order.courier.firstName} ${order.courier.lastName}`
@@ -55,14 +41,20 @@ export function AdminOrderCard({
 
         <div className="text-sm sm:text-right">
           <p className="text-zinc-500">
+            {formatFulfillmentType(order.fulfillmentType)}
+          </p>
+          <p className="mt-1 text-zinc-500">
             {formatPaymentMethod(order.paymentMethod)}
+          </p>
+          <p className="mt-1 text-zinc-500">
+            Payment {formatPaymentStatus(order.paymentStatus).toLowerCase()}
           </p>
           <p className="mt-1 text-base font-semibold text-orange-700">
             {formatMealPrice(order.totalPrice)}
           </p>
-          {order.estimatedDeliveryTime ? (
+          {order.estimatedDeliveryTime != null ? (
             <p className="mt-1 text-zinc-500">
-              ETA {formatOrderDate(order.estimatedDeliveryTime)}
+              {formatEstimatedDeliveryTime(order.estimatedDeliveryTime)}
             </p>
           ) : null}
         </div>
@@ -75,7 +67,7 @@ export function AdminOrderCard({
           <dd className="text-zinc-500">{order.customer.email}</dd>
         </div>
         <div>
-          <dt className="font-medium text-zinc-500">Delivery address</dt>
+          <dt className="font-medium text-zinc-500">Address</dt>
           <dd className="mt-0.5 text-zinc-900">{order.orderAddress}</dd>
         </div>
         <div>
@@ -88,6 +80,16 @@ export function AdminOrderCard({
           ) : null}
         </div>
       </dl>
+
+      {order.note ? (
+        <p className="mt-4 text-sm text-zinc-600">Note: {order.note}</p>
+      ) : null}
+
+      {order.failureNote ? (
+        <p className="mt-2 text-sm text-red-700">
+          Failure note: {order.failureNote}
+        </p>
+      ) : null}
 
       <ul className="mt-4 divide-y divide-zinc-100 border-t border-zinc-100">
         {order.items.map((item) => (
@@ -109,48 +111,6 @@ export function AdminOrderCard({
           </li>
         ))}
       </ul>
-
-      {nextStatuses.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-100 pt-4">
-          {nextStatuses.map((status) => {
-            const isReject = status === OrderStatus.REJECTED;
-            const isPending = isUpdating && pendingStatus === status;
-
-            return (
-              <button
-                key={status}
-                type="button"
-                disabled={isUpdating}
-                onClick={() => {
-                  onStatusChange(status);
-                }}
-                className={
-                  isReject
-                    ? "inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    : "inline-flex h-10 items-center justify-center rounded-lg bg-orange-600 px-4 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
-                }
-              >
-                {isPending
-                  ? "Updating..."
-                  : (ADMIN_STATUS_ACTION_LABELS[status] ?? status)}
-              </button>
-            );
-          })}
-        </div>
-      ) : order.status === OrderStatus.READY ? (
-        <p className="mt-4 border-t border-zinc-100 pt-4 text-sm text-zinc-500">
-          Waiting for a courier to pick up this order.
-        </p>
-      ) : null}
-
-      {error ? (
-        <p
-          role="alert"
-          className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-        >
-          {error}
-        </p>
-      ) : null}
     </article>
   );
 }

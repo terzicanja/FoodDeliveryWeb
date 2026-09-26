@@ -6,11 +6,8 @@ import { MealList } from "@/components/restaurants/MealList";
 import { RestaurantHero } from "@/components/restaurants/RestaurantHero";
 import { RestaurantLocation } from "@/components/restaurants/RestaurantLocation";
 import { getAuthPayload } from "@/lib/auth-request";
-import { geocodeAddress } from "@/lib/geocoding";
-import {
-  getReviewEligibilityForUser,
-  getReviewsForMeals,
-} from "@/lib/reviews";
+import { geocodeAddress, isValidCoordinates } from "@/lib/geocoding";
+import { getReviewEligibilityForUser, getReviewsForMeals } from "@/lib/reviews";
 import { getRestaurantById } from "@/lib/restaurants";
 
 type RestaurantPageProps = {
@@ -32,17 +29,24 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
   const mealIds = meals.map((meal) => meal.id);
   const auth = await getAuthPayload();
 
+  const storedCoordinates =
+    restaurant.latitude != null && restaurant.longitude != null
+      ? {
+          latitude: restaurant.latitude,
+          longitude: restaurant.longitude,
+        }
+      : null;
+
   const [reviewsByMeal, eligibilityByMeal, coordinates] = await Promise.all([
     getReviewsForMeals(mealIds),
     auth?.role === Role.CUSTOMER
       ? getReviewEligibilityForUser(auth.userId, mealIds)
       : Promise.resolve(
-          new Map<
-            number,
-            { canReview: boolean; ownReview: null }
-          >(),
+          new Map<number, { canReview: boolean; ownReview: null }>(),
         ),
-    geocodeAddress(restaurant.address),
+    isValidCoordinates(storedCoordinates)
+      ? Promise.resolve(storedCoordinates)
+      : geocodeAddress(restaurant.address),
   ]);
 
   return (
@@ -61,12 +65,6 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
           <RestaurantHero restaurant={restaurantInfo} />
         </div>
 
-        <RestaurantLocation
-          name={restaurant.name}
-          address={restaurant.address}
-          coordinates={coordinates}
-        />
-
         <section className="mt-10">
           <div className="mb-6">
             <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">
@@ -84,6 +82,11 @@ export default async function RestaurantPage({ params }: RestaurantPageProps) {
             eligibilityByMeal={eligibilityByMeal}
           />
         </section>
+        <RestaurantLocation
+          name={restaurant.name}
+          address={restaurant.address}
+          coordinates={coordinates}
+        />
       </main>
     </div>
   );

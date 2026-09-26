@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RatingSummaryDisplay } from "@/components/reviews/RatingSummary";
+import { formatDistanceKm } from "@/lib/geo-distance";
 import {
   formatRestaurantType,
   type RestaurantListItem,
@@ -37,6 +38,11 @@ export function RestaurantCard({ restaurant }: RestaurantCardProps) {
       </p>
 
       <p className="mt-4 text-sm text-zinc-500">{restaurant.address}</p>
+      {restaurant.distanceKm != null ? (
+        <p className="mt-1 text-sm font-medium text-orange-700">
+          {formatDistanceKm(restaurant.distanceKm)}
+        </p>
+      ) : null}
 
       <div className="mt-3">
         <RatingSummaryDisplay

@@ -31,7 +31,7 @@ export function RestaurantLocation({
           longitude={coordinates.longitude}
         />
       ) : (
-        <div className="flex h-72 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center sm:h-96">
+        <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white px-6 text-center sm:h-64">
           <p className="text-sm text-zinc-500">Location unavailable</p>
         </div>
       )}
